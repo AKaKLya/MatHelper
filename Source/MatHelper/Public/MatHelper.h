@@ -1,4 +1,4 @@
-// Copyright AKaKLya
+// Copyright AKaKLya 2024
 
 #pragma once
 
@@ -24,7 +24,8 @@ public:
 	
 	void EditorNotify(const FString&  NotifyInfo, SNotificationItem::ECompletionState State);
 	
-
+	TArray<TSharedPtr<FString>> MaskPinOptions;
+	
 private:
 	FString PluginPath;
 	TArray<TWeakPtr<IMaterialEditor>> MatEditors;

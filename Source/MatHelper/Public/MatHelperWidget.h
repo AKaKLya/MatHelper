@@ -1,4 +1,4 @@
-// Copyright AKaKLya
+// Copyright AKaKLya 2024
 
 #pragma once
 
@@ -8,6 +8,8 @@
 class UMaterialGraphNode;
 class FMatHelperModule;
 class IMaterialEditor;
+
+
 
 class SMatHelperWidget : public SScrollBox
 {
@@ -28,9 +30,11 @@ private:
 	TSharedPtr<SEditableTextBox> GroupText;
 	FReply SetNodeGroup(bool AutoGroup);
 	
-	TSharedPtr<SEditableTextBox> MaskPinText;
+	//TSharedPtr<SEditableTextBox> MaskPinText;
 	FReply AddNodeMaskPin();
 	inline void AddMaskPin(UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask,bool& Out_IsAddSuccess);
+	int CurrentSelect = 0;
+
 	
 	TArray<TSharedPtr<SButton>> NodeButtons;
 	FReply InitialButton();

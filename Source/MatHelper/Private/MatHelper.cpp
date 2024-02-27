@@ -1,4 +1,4 @@
-// Copyright AKaKLya
+// Copyright AKaKLya 2024
 
 #include "MatHelper.h"
 
@@ -52,6 +52,16 @@ void FMatHelperModule::StartupModule()
 			}
 		});
 	});
+	
+	MaskPinOptions.Add(MakeShareable(new FString("R")));
+	MaskPinOptions.Add(MakeShareable(new FString("G")));
+	MaskPinOptions.Add(MakeShareable(new FString("B")));
+	MaskPinOptions.Add(MakeShareable(new FString("A")));
+	MaskPinOptions.Add(MakeShareable(new FString("RGB")));
+	MaskPinOptions.Add(MakeShareable(new FString("RGBA")));
+	MaskPinOptions.Add(MakeShareable(new FString("RG")));
+	MaskPinOptions.Add(MakeShareable(new FString("BA")));
+	MaskPinOptions.Add(MakeShareable(new FString("ShowName")));
 	
 }
 

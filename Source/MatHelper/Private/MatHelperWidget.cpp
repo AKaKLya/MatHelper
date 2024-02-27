@@ -1,8 +1,9 @@
-// Copyright AKaKLya
+// Copyright AKaKLya 2024
 
 
 #include "MatHelperWidget.h"
 
+#include "GraphActionNode.h"
 #include "MaterialGraphNode_Knot.h"
 #include "MatHelper.h"
 #include "Editor/MaterialEditor/Public/IMaterialEditor.h"
@@ -33,7 +34,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs)
 	
 	
 	SAssignNew(GroupText,SEditableTextBox);
-	SAssignNew(MaskPinText,SEditableTextBox);
+//	SAssignNew(MaskPinText,SEditableTextBox);
 	
 	AddSlot()
 	.Padding(5.0f)
@@ -63,10 +64,33 @@ void SMatHelperWidget::Construct(const FArguments& InArgs)
 
 
 	
-	AddSlot()
+/*	AddSlot()
 	.Padding(5.0f)
 	[
 		MaskPinText.ToSharedRef()	
+	];*/
+
+	AddSlot()
+	.Padding(5.0f)
+	[
+		SNew(SComboBox<TSharedPtr<FString>>)
+		.OptionsSource(&MatHelper.MaskPinOptions)
+		.OnGenerateWidget_Lambda([](const TSharedPtr<FString>& InString)
+		{
+			return SNew(STextBlock)
+			.Text(FText::FromString(*InString));
+		})
+		.OnSelectionChanged_Lambda([&](const TSharedPtr<FString>& NewOption,ESelectInfo::Type SelectInfo)
+		{
+			CurrentSelect = MatHelper.MaskPinOptions.Find(NewOption);
+		})
+		[
+			SNew(STextBlock)
+			.Text_Lambda([&]()
+			{
+				return FText::FromString(*MatHelper.MaskPinOptions[CurrentSelect]);
+			})
+		]
 	];
 
 	AddSlot()
@@ -222,7 +246,7 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup)
 
 FReply SMatHelperWidget::AddNodeMaskPin()
 {
-	int32 MaskIndex = FCString::Atoi(*MaskPinText->GetText().ToString());
+//	int32 MaskIndex = FCString::Atoi(*MaskPinText->GetText().ToString());
 	
 	if( InitialMatEditorInterface() == false )
 	{
@@ -244,44 +268,49 @@ FReply SMatHelperWidget::AddNodeMaskPin()
 	UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(SelectedNodes[0]);
 	
 	bool IsAddSuccess = false;
-	switch (MaskIndex)
+	switch (CurrentSelect)
 	{
-	case 1 :
+	case 0 :
 		{
 			AddMaskPin(MatNode,"R",FIntVector4(1,0,0,0),IsAddSuccess);
 			break;
 		}
-	case 2 :
+	case 1 :
 		{
 			AddMaskPin(MatNode,"G",FIntVector4(0,1,0,0),IsAddSuccess);
 			break;
 		}
-	case 3:
+	case 2:
 		{
 			AddMaskPin(MatNode,"B",FIntVector4(0,0,1,0),IsAddSuccess);
 			break;
 		}
-	case 4:
+	case 3:
 		{
 			AddMaskPin(MatNode,"A",FIntVector4(0,0,0,1),IsAddSuccess);
 			break;
 		}
-	case 5:
+	case 4:
 		{
 			AddMaskPin(MatNode,"RGB",FIntVector4(1,1,1,0),IsAddSuccess);
 			break;
 		}
-	case 6:
+	case 5:
 		{
 			AddMaskPin(MatNode,"RGBA",FIntVector4(1,1,1,1),IsAddSuccess);
 			break;
 		}
-	case 7:
+	case 6:
 		{
 			AddMaskPin(MatNode,"RG",FIntVector4(1,1,0,0),IsAddSuccess);
 			break;
 		}
-	case 11:
+	case 7:
+		{
+			AddMaskPin(MatNode,"BA",FIntVector4(0,0,1,1),IsAddSuccess);
+			break;
+		}
+	case 8:
 		{
 			MatNode->MaterialExpression->bShowOutputNameOnPin = !MatNode->MaterialExpression->bShowOutputNameOnPin;
 			IsAddSuccess = true;
@@ -338,7 +367,6 @@ FReply SMatHelperWidget::InitialButton()
 		FString Key = FString::Printf(TEXT("%d"),i+1);
 		GConfig->GetString(L"name",*Key,ButtonName,FileName);
 		ButtonName = ButtonName.Len() == 0 ? "None" : ButtonName;
-		
 		TSharedPtr<SButton> Button = SNew(SButton)
 		.Text(FText::FromString(ButtonName))
 		.VAlign(VAlign_Center)

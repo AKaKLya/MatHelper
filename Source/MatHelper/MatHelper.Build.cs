@@ -1,4 +1,4 @@
-// Copyright AKaKLya
+// Copyright AKaKLya 2024
 
 using UnrealBuildTool;
 
@@ -41,7 +41,8 @@ public class MatHelper : ModuleRules
 				"UnrealEd",
 				"MaterialEditor",
 				"Projects",
-				"ApplicationCore"
+				"ApplicationCore",
+				"InputCore"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
