@@ -3,7 +3,6 @@
 
 #include "MatHelperWidget.h"
 
-#include "GraphActionNode.h"
 #include "MaterialGraphNode_Knot.h"
 #include "MatHelper.h"
 #include "Editor/MaterialEditor/Public/IMaterialEditor.h"
@@ -34,7 +33,6 @@ void SMatHelperWidget::Construct(const FArguments& InArgs)
 	
 	
 	SAssignNew(GroupText,SEditableTextBox);
-//	SAssignNew(MaskPinText,SEditableTextBox);
 	
 	AddSlot()
 	.Padding(5.0f)
@@ -61,14 +59,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs)
 		.HAlign(HAlign_Center)
 		.OnClicked(FOnClicked::CreateRaw(this,&SMatHelperWidget::SetNodeGroup,true))
 	];
-
-
 	
-/*	AddSlot()
-	.Padding(5.0f)
-	[
-		MaskPinText.ToSharedRef()	
-	];*/
 
 	AddSlot()
 	.Padding(5.0f)
@@ -120,8 +111,6 @@ void SMatHelperWidget::Construct(const FArguments& InArgs)
 			return FReply::Handled();
 		}))
 	];
-
-
 	
 	AddSlot()
 	.Padding(3.0f)
@@ -175,8 +164,12 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup)
 		return FReply::Handled();
 	}
 	
-	int32 NodeNum = MatEditorInterface->GetNumberOfSelectedNodes();
-	
+	TArray<FString> Names;
+	if(AutoGroup)
+	{
+		const FString AutoFile = PluginConfigPath + "AutoGroup.ini";
+		FFileHelper::LoadFileToStringArray(Names,*AutoFile);
+	}
 	TArray<UObject*> SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
 	MatEditorInterface->FocusWindow();
 	
@@ -194,9 +187,6 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup)
 			{
 				if(AutoGroup)
 				{
-					FString AutoFile = PluginConfigPath + "AutoGroup.ini";
-					TArray<FString> Names;
-					FFileHelper::LoadFileToStringArray(Names,*AutoFile);
 					for(FString Name : Names)
 					{
 						if(Parameter->ParameterName.ToString().Contains(Name))
@@ -216,9 +206,6 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup)
 			{
 				if(AutoGroup)
 				{
-					FString AutoFile = PluginConfigPath + "AutoGroup.ini";
-					TArray<FString> Names;
-					FFileHelper::LoadFileToStringArray(Names,*AutoFile);
 					for(FString Name : Names)
 					{
 						if(TexParameter->ParameterName.ToString().Contains(Name))
@@ -246,7 +233,6 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup)
 
 FReply SMatHelperWidget::AddNodeMaskPin()
 {
-//	int32 MaskIndex = FCString::Atoi(*MaskPinText->GetText().ToString());
 	
 	if( InitialMatEditorInterface() == false )
 	{
@@ -330,22 +316,32 @@ FReply SMatHelperWidget::AddNodeMaskPin()
 	return FReply::Handled();
 }
 
-inline void SMatHelperWidget::AddMaskPin(UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask,bool& Out_IsAddSuccess)
+inline void SMatHelperWidget::AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask,bool& Out_IsAddSuccess)
 {
-	bool HasPin = false;
-	TArray<FExpressionOutput>& Outputs = MatNode->MaterialExpression->Outputs;
-	for(FExpressionOutput& Output : Outputs)
+	TObjectPtr<UMaterialExpression> Expression = MatNode->MaterialExpression;
+	TArray<FExpressionOutput>& Outputs = Expression->Outputs;
+	bool Found = false;
+	int Index = -1;
+	for(auto& Output : Outputs)
 	{
-		if(Output.OutputName.ToString() == Name)
+		FIntVector4 PinMask = FIntVector4(Output.MaskR,Output.MaskG,Output.MaskB,Output.MaskA);
+		Index = Index + 1;
+		if(PinMask == Mask)
 		{
-			HasPin = true;
+			Found = true;
+			break;
 		}
 	}
-	if(!HasPin)
+	
+	if(!Found)
 	{
 		Outputs.Add(FExpressionOutput(FName(*Name), 1, Mask.X, Mask.Y, Mask.Z, Mask.W));
-		Out_IsAddSuccess = true;
 	}
+	else
+	{
+		Outputs.RemoveAt(Index);
+	}
+	Out_IsAddSuccess = true;
 }
 
 FReply SMatHelperWidget::InitialButton()
@@ -358,7 +354,7 @@ FReply SMatHelperWidget::InitialButton()
 	NodeButtons.Empty();
 	
 	int32 Num = 0;
-	FString FileName = PluginConfigPath+"AddNodeInfo.ini";
+	const FString FileName = PluginConfigPath+"AddNodeInfo.ini";
 	GConfig->LoadFile(FileName);
 	GConfig->GetInt(L"mgn",L"Num",Num,FileName);
 	for(int i = 0 ; i < Num ; i++)
@@ -383,10 +379,10 @@ FReply SMatHelperWidget::InitialButton()
 	return FReply::Handled();
 }
 
-FReply SMatHelperWidget::CreateMatNode(int32 index)
+FReply SMatHelperWidget::CreateMatNode(int32 Index)
 {
-	FString ConfigFileName = PluginConfigPath + "AddNodeInfo.ini";
-	FString NodeFileName = PluginConfigPath + "AddNodeFile/" + FString::FromInt(index) + ".txt";
+	const FString ConfigFileName = PluginConfigPath + "AddNodeInfo.ini";
+	const FString NodeFileName = PluginConfigPath + "AddNodeFile/" + FString::FromInt(Index) + ".txt";
 	FString NodeText;
 	FFileHelper::LoadFileToString(NodeText,*NodeFileName);
 	FPlatformApplicationMisc::ClipboardCopy(*NodeText);
@@ -397,9 +393,8 @@ FReply SMatHelperWidget::CreateMatNode(int32 index)
 	}
 	
 	MatEditorInterface->FocusWindow();
-	IMaterialEditor* IMatEditorPtr = MatEditorInterface;
 	
-	UObject* SelectedNode = IMatEditorPtr->GetSelectedNodes().Array()[0];
+	UObject* SelectedNode = MatEditorInterface->GetSelectedNodes().Array()[0];
 	
 	GConfig->LoadFile(ConfigFileName);
 	
@@ -412,19 +407,20 @@ FReply SMatHelperWidget::CreateMatNode(int32 index)
 	GConfig->GetInt(L"mgn",L"BaseoffsetY",BaseOffset.Y,*ConfigFileName);
 	
 
-	if(auto RootNode = Cast<UMaterialGraphNode_Root>(SelectedNode))
+	if(const auto RootNode = Cast<UMaterialGraphNode_Root>(SelectedNode))
 	{
-		FVector2D Location = FVector2D(RootNode->NodePosX + RootOffset.X,RootNode->NodePosY + RootOffset.Y);
-		IMatEditorPtr->PasteNodesHere(Location);
+		const FVector2D Location = FVector2D(RootNode->NodePosX + RootOffset.X,RootNode->NodePosY + RootOffset.Y);
+		MatEditorInterface->PasteNodesHere(Location);
 	}
-	else if(auto BaseNode = Cast<UMaterialGraphNode>(SelectedNode))
+	else if(const auto BaseNode = Cast<UMaterialGraphNode>(SelectedNode))
 	{
-		FVector2D Location = FVector2D(BaseNode->NodePosX + BaseOffset.X,BaseNode->NodePosY + BaseOffset.Y);
-		IMatEditorPtr->PasteNodesHere(Location);
+		const FVector2D Location = FVector2D(BaseNode->NodePosX + BaseOffset.X,BaseNode->NodePosY + BaseOffset.Y);
+		MatEditorInterface->PasteNodesHere(Location);
 	}
 	
 	return FReply::Handled();
-};
+}
+
 
 
 inline bool SMatHelperWidget::CheckNode(UObject* Node)
