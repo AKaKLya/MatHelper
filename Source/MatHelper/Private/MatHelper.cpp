@@ -1,7 +1,6 @@
 // Copyright AKaKLya 2024
 
 #include "MatHelper.h"
-
 #include "MatHelperWidget.h"
 #include "Editor/MaterialEditor/Public/IMaterialEditor.h"
 #include "Editor/MaterialEditor/Public/MaterialEditorModule.h"
@@ -10,13 +9,16 @@
 
 #define LOCTEXT_NAMESPACE "FMatHelperModule"
 
-
+namespace MatHelperSpace
+{
+	static TArray<TWeakPtr<SMatHelperWidget>> MhWidgets;
+}
+using namespace MatHelperSpace;
 
 void FMatHelperModule::StartupModule()
 {
 	
 	PluginPath = IPluginManager::Get().FindPlugin("MatHelper")->GetBaseDir();
-
 	IMaterialEditorModule& MatInterface = IMaterialEditorModule::Get();
 	MatInterface.OnMaterialEditorOpened().AddLambda([&](const TWeakPtr<IMaterialEditor>& InMatEditor)
 	{
@@ -31,6 +33,8 @@ void FMatHelperModule::StartupModule()
 			TabManager->RegisterTabSpawner("MatHelper",FOnSpawnTab::CreateLambda([&](const FSpawnTabArgs& Args)
 			{
 				TSharedRef<SMatHelperWidget> MhWidget = SNew(SMatHelperWidget);
+				MhWidget->MatEditorInterface = MatEditor;
+				MhWidgets.Add(MhWidget);
 				TSharedRef<SDockTab> Dock = SNew(SDockTab)
 				[
 					MhWidget
@@ -39,17 +43,6 @@ void FMatHelperModule::StartupModule()
 			}))
 			.SetGroup(WorkspaceMenuCategory.ToSharedRef())
 			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "Kismet.Tabs.Palette"));
-		});
-
-		MatEditor->OnMaterialEditorClosed().AddLambda([&]()
-		{
-			for(int i=0;i<MatEditors.Num();i++)
-			{
-				if( MatEditors[i].Pin().IsValid()==false )
-				{
-					MatEditors.RemoveAt(i);
-				}
-			}
 		});
 	});
 	
@@ -70,7 +63,21 @@ void FMatHelperModule::ShutdownModule()
 
 }
 
-
+void FMatHelperModule::CreateMat(UMaterial* InMaterial, TWeakPtr<IMaterialEditor> InMatEditor)
+{
+	for(auto MhWidget : MhWidgets)
+	{
+		if(MhWidget.Pin().IsValid())
+		{
+			SMatHelperWidget* MhWdiget = MhWidget.Pin().Get();
+			if(MhWdiget->MatEditorInterface == InMatEditor.Pin().Get())
+			{
+				MhWdiget->Material = InMaterial;
+				break;
+			}
+		}
+	}
+}
 
 void FMatHelperModule::EditorNotify(const FString& NotifyInfo, SNotificationItem::ECompletionState State)
 {
@@ -82,7 +89,6 @@ void FMatHelperModule::EditorNotify(const FString& NotifyInfo, SNotificationItem
 	NotificationItem->SetCompletionState(State);
 	NotificationItem->ExpireAndFadeout();
 }
-
 
 
 

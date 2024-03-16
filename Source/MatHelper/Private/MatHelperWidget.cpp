@@ -1,11 +1,16 @@
 // Copyright AKaKLya 2024
-
+#define protected public
 
 #include "MatHelperWidget.h"
 
+#include "AssetViewUtils.h"
+#include "TAccessPrivate.inl"
+#include "IContentBrowserSingleton.h"
 #include "MaterialGraphNode_Knot.h"
 #include "MatHelper.h"
+
 #include "Editor/MaterialEditor/Public/IMaterialEditor.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "MaterialGraph/MaterialGraphNode.h"
 #include "MaterialGraph/MaterialGraphNode_Comment.h"
 #include "MaterialGraph/MaterialGraphNode_Composite.h"
@@ -13,26 +18,27 @@
 #include "MaterialGraph/MaterialGraphNode_Root.h"
 #include "Materials/MaterialExpressionParameter.h"
 #include "Materials/MaterialExpressionTextureSampleParameter.h"
+#include "Subsystems/EditorAssetSubsystem.h"
 #include "Windows/WindowsPlatformApplicationMisc.h"
 
 namespace MatHelperWidget
 {
 	static FMatHelperModule MatHelper;
 }
-
 using namespace MatHelperWidget;
 
-
-void SMatHelperWidget::Construct(const FArguments& InArgs)
+void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 {
 	SScrollBox::Construct(SScrollBox::FArguments());
-	
+	Material = InMaterial;
 	
 	MatHelper = FModuleManager::Get().GetModuleChecked<FMatHelperModule>("MatHelper");
 	PluginConfigPath = MatHelper.GetPluginPath().Append("/Config/");
 	
 	
 	SAssignNew(GroupText,SEditableTextBox);
+	SAssignNew(InstanceText,SEditableTextBox);
+	
 	
 	AddSlot()
 	.Padding(5.0f)
@@ -95,7 +101,99 @@ void SMatHelperWidget::Construct(const FArguments& InArgs)
 	];
 
 	
+	
+	AddSlot()
+	.Padding(5.0f)
+	[
+		InstanceText.ToSharedRef()
+	];
+	
+	
+	AddSlot()
+	.Padding(3.0f)
+	[
+		SNew(SButton)
+		.Text(FText::FromString("Create Instance"))
+		.VAlign(VAlign_Center)
+		.HAlign(HAlign_Center)
+		.OnClicked(FOnClicked::CreateRaw(this,&SMatHelperWidget::CreateInstance))
+	];
 
+	AddSlot()
+	.Padding(3.0f)
+	[
+		SNew(SButton)
+		.Text(FText::FromString("Refraction"))
+		.VAlign(VAlign_Center)
+		.HAlign(HAlign_Center)
+		.OnClicked(FOnClicked::CreateLambda([&]()
+		{
+			if(InitialMatEditorInterface() == false)
+			{
+				return FReply::Handled();
+			}
+			auto& Ref = MatEditorInterface->GetMaterialInterface()->GetMaterial()->RefractionMethod;
+			if (Ref == RM_None)
+			{
+				Ref = RM_IndexOfRefraction;
+			}
+			else
+			{
+				Ref = RM_None;
+			}
+			MatEditorInterface->UpdateMaterialAfterGraphChange();
+			return FReply::Handled();
+		}))
+	];
+
+	AddSlot()
+	.Padding(3.0f)
+	[
+		SNew(SButton)
+		.Text(FText::FromString("Fix Function Node"))
+		.VAlign(VAlign_Center)
+		.HAlign(HAlign_Center)
+		.OnClicked(FOnClicked::CreateLambda([&]()
+		{
+			if(InitialMatEditorInterface() == false)
+			{
+				return FReply::Handled();
+			}
+			bool bNeedRefresh = false;
+			auto Nodes = MatEditorInterface->GetSelectedNodes().Array();
+			for(const auto Node : Nodes)
+			{
+				UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(Node);
+				if(Cast<UMaterialExpressionMaterialFunctionCall>(MatNode->MaterialExpression))
+				{
+					MatNode->RecreateAndLinkNode();
+					bNeedRefresh = true;
+				}
+			}
+			if(bNeedRefresh)
+			{
+				MatEditorInterface->UpdateMaterialAfterGraphChange();
+			}
+			return FReply::Handled();
+		}))
+	];
+
+	AddSlot()
+	.Padding(3.0f)
+	[
+		SNew(SButton)
+		.Text(FText::FromString("Edit Group"))
+		.VAlign(VAlign_Center)
+		.HAlign(HAlign_Center)
+		.OnClicked(FOnClicked::CreateLambda([&]()
+		{
+			FString Path = PluginConfigPath + "AutoGroup.ini";
+			Path.ReplaceCharInline('/','\\');
+			FWindowsPlatformProcess::CreateProc(L"notepad.exe",*Path,false,false,false,nullptr,0,nullptr,nullptr);
+			return FReply::Handled();
+		}))
+	];
+	
 	AddSlot()
 	.Padding(3.0f)
 	[
@@ -128,6 +226,10 @@ void SMatHelperWidget::Construct(const FArguments& InArgs)
 
 bool SMatHelperWidget::InitialMatEditorInterface()
 {
+	if(MatEditorInterface != nullptr)
+	{
+		return true;
+	}
 	TArray<TWeakPtr<IMaterialEditor>> MatEditors = MatHelper.GetMatEditors();
 	TArray<IMaterialEditor*> HasSelectNodesMatEditor;
 	for(TWeakPtr<IMaterialEditor> MatEditor : MatEditors)
@@ -182,7 +284,6 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup)
 			{
 				continue;
 			}
-			
 			if(UMaterialExpressionParameter* Parameter = Cast<UMaterialExpressionParameter>(MatNode->MaterialExpression))
 			{
 				if(AutoGroup)
@@ -311,18 +412,17 @@ FReply SMatHelperWidget::AddNodeMaskPin()
 		MatNode->RecreateAndLinkNode();
 		MatEditorInterface->UpdateMaterialAfterGraphChange();
 	}
-	
-	
 	return FReply::Handled();
 }
 
 inline void SMatHelperWidget::AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask,bool& Out_IsAddSuccess)
 {
-	TObjectPtr<UMaterialExpression> Expression = MatNode->MaterialExpression;
+	const TObjectPtr<UMaterialExpression> Expression = MatNode->MaterialExpression;
 	TArray<FExpressionOutput>& Outputs = Expression->Outputs;
+
 	bool Found = false;
 	int Index = -1;
-	for(auto& Output : Outputs)
+	for(const auto& Output : Outputs)
 	{
 		FIntVector4 PinMask = FIntVector4(Output.MaskR,Output.MaskG,Output.MaskB,Output.MaskA);
 		Index = Index + 1;
@@ -342,6 +442,46 @@ inline void SMatHelperWidget::AddMaskPin(const UMaterialGraphNode* MatNode, cons
 		Outputs.RemoveAt(Index);
 	}
 	Out_IsAddSuccess = true;
+}
+
+FReply SMatHelperWidget::CreateInstance()
+{
+	if( InitialMatEditorInterface() == false || Material == nullptr)
+	{
+		return FReply::Handled();
+	}
+	FString Target = Material->GetPathName();
+	const FString BaseName = Material->GetName();
+	Target.ReplaceInline(*BaseName,*FString(""));
+	Target.ReplaceInline(*FString("."),*FString(""));
+
+	FString NewName = BaseName;
+	if(BaseName.Left(2) == "M_")
+	{
+		NewName.ReplaceInline(*FString("M_"),*FString("MI_"));
+	}
+	else
+	{
+		NewName = "MI_" + BaseName;
+	}
+	FString InText = InstanceText->GetText().ToString();
+
+	if(InText == "")
+	{
+		InText = "Inst" + FString::FromInt(UKismetMathLibrary::RandomIntegerInRange(0,99));
+	}
+	
+	NewName = Target + NewName + "_" + InText;
+	
+	UEditorAssetSubsystem* EditorAssetSubsystem = GEditor->GetEditorSubsystem<UEditorAssetSubsystem>();
+	UMaterialInstance* NewMi = Cast<UMaterialInstance>(EditorAssetSubsystem->DuplicateAsset(MIEmptyPath, NewName));
+	NewMi->Parent=Material;
+	
+	TArray<UObject*> AssetList;
+	AssetList.Add(NewMi);
+	IContentBrowserSingleton::Get().SyncBrowserToAssets(AssetList);
+	AssetViewUtils::OpenEditorForAsset(NewMi);
+	return FReply::Handled();
 }
 
 FReply SMatHelperWidget::InitialButton()
@@ -393,9 +533,7 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 	}
 	
 	MatEditorInterface->FocusWindow();
-	
-	UObject* SelectedNode = MatEditorInterface->GetSelectedNodes().Array()[0];
-	
+	auto SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
 	GConfig->LoadFile(ConfigFileName);
 	
 	FIntVector2 RootOffset = FIntVector2(100,800);
@@ -406,16 +544,24 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 	GConfig->GetInt(L"mgn",L"BaseoffsetX",BaseOffset.X,*ConfigFileName);
 	GConfig->GetInt(L"mgn",L"BaseoffsetY",BaseOffset.Y,*ConfigFileName);
 	
-
-	if(const auto RootNode = Cast<UMaterialGraphNode_Root>(SelectedNode))
+	if(SelectedNodes.Num() > 0)
 	{
-		const FVector2D Location = FVector2D(RootNode->NodePosX + RootOffset.X,RootNode->NodePosY + RootOffset.Y);
-		MatEditorInterface->PasteNodesHere(Location);
+		UObject* SelectedNode = SelectedNodes[0];
+		if(const auto RootNode = Cast<UMaterialGraphNode_Root>(SelectedNode))
+		{
+			const FVector2D Location = FVector2D(RootNode->NodePosX + RootOffset.X,RootNode->NodePosY + RootOffset.Y);
+			MatEditorInterface->PasteNodesHere(Location);
+		}
+		else if(const auto BaseNode = Cast<UMaterialGraphNode>(SelectedNode))
+		{
+			const FVector2D Location = FVector2D(BaseNode->NodePosX + BaseOffset.X,BaseNode->NodePosY + BaseOffset.Y);
+			MatEditorInterface->PasteNodesHere(Location);
+		}
 	}
-	else if(const auto BaseNode = Cast<UMaterialGraphNode>(SelectedNode))
+	else
 	{
-		const FVector2D Location = FVector2D(BaseNode->NodePosX + BaseOffset.X,BaseNode->NodePosY + BaseOffset.Y);
-		MatEditorInterface->PasteNodesHere(Location);
+		MatEditorInterface->PasteNodesHere(FVector2D(464,1104));
+		MatEditorInterface->JumpToExpression(Cast<UMaterialGraphNode>(MatEditorInterface->GetSelectedNodes().Array()[0])->MaterialExpression);
 	}
 	
 	return FReply::Handled();

@@ -23,9 +23,8 @@ public:
 	TArray<TWeakPtr<IMaterialEditor>> GetMatEditors(){ return MatEditors;};
 	
 	void EditorNotify(const FString&  NotifyInfo, SNotificationItem::ECompletionState State);
-	
 	TArray<TSharedPtr<FString>> MaskPinOptions;
-	
+	static void CreateMat(UMaterial* InMaterial,TWeakPtr<IMaterialEditor> InMatEditor);
 private:
 	FString PluginPath;
 	TArray<TWeakPtr<IMaterialEditor>> MatEditors;
