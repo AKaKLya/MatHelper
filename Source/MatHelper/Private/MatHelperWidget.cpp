@@ -23,7 +23,7 @@
 
 namespace MatHelperWidget
 {
-	static FMatHelperModule MatHelper;
+	FMatHelperModule MatHelper;
 }
 using namespace MatHelperWidget;
 
@@ -455,26 +455,33 @@ FReply SMatHelperWidget::CreateInstance()
 	Target.ReplaceInline(*BaseName,*FString(""));
 	Target.ReplaceInline(*FString("."),*FString(""));
 
-	FString NewName = BaseName;
+	FString NewPath = BaseName;
 	if(BaseName.Left(2) == "M_")
 	{
-		NewName.ReplaceInline(*FString("M_"),*FString("MI_"));
+		NewPath.ReplaceInline(*FString("M_"),*FString("MI_"));
 	}
 	else
 	{
-		NewName = "MI_" + BaseName;
+		NewPath = "MI_" + BaseName;
 	}
 	FString InText = InstanceText->GetText().ToString();
+
+	
 
 	if(InText == "")
 	{
 		InText = "Inst" + FString::FromInt(UKismetMathLibrary::RandomIntegerInRange(0,99));
 	}
 	
-	NewName = Target + NewName + "_" + InText;
+	NewPath = Target + NewPath + "_" + InText;
 	
 	UEditorAssetSubsystem* EditorAssetSubsystem = GEditor->GetEditorSubsystem<UEditorAssetSubsystem>();
-	UMaterialInstance* NewMi = Cast<UMaterialInstance>(EditorAssetSubsystem->DuplicateAsset(MIEmptyPath, NewName));
+	if(EditorAssetSubsystem->DoesAssetExist(NewPath))
+	{
+		MatHelper.EditorNotify("Create Fail - This Instance Exists",SNotificationItem::CS_Fail);
+		return FReply::Handled();
+	}
+	UMaterialInstance* NewMi = Cast<UMaterialInstance>(EditorAssetSubsystem->DuplicateAsset(MIEmptyPath, NewPath));
 	NewMi->Parent=Material;
 	
 	TArray<UObject*> AssetList;
@@ -563,6 +570,7 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 		MatEditorInterface->PasteNodesHere(FVector2D(464,1104));
 		MatEditorInterface->JumpToExpression(Cast<UMaterialGraphNode>(MatEditorInterface->GetSelectedNodes().Array()[0])->MaterialExpression);
 	}
+	
 	
 	return FReply::Handled();
 }
