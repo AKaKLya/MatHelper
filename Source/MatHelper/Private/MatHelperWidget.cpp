@@ -53,7 +53,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 		.Text(FText::FromString("Set Group"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked(FOnClicked::CreateRaw(this,&SMatHelperWidget::SetNodeGroup,false))
+		.OnClicked_Raw(this,&SMatHelperWidget::SetNodeGroup,false)
 	];
 
 	AddSlot()
@@ -63,7 +63,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 		.Text(FText::FromString("Auto Group"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked(FOnClicked::CreateRaw(this,&SMatHelperWidget::SetNodeGroup,true))
+		.OnClicked_Raw(this,&SMatHelperWidget::SetNodeGroup,true)
 	];
 	
 
@@ -97,7 +97,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 		.Text(FText::FromString("Add Mask Pin"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked(FOnClicked::CreateRaw(this,&SMatHelperWidget::AddNodeMaskPin))
+		.OnClicked_Raw(this,&SMatHelperWidget::AddNodeMaskPin)
 	];
 
 	
@@ -116,7 +116,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 		.Text(FText::FromString("Create Instance"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked(FOnClicked::CreateRaw(this,&SMatHelperWidget::CreateInstance))
+		.OnClicked_Raw(this,&SMatHelperWidget::CreateInstance)
 	];
 
 	AddSlot()
@@ -126,24 +126,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 		.Text(FText::FromString("Refraction"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked(FOnClicked::CreateLambda([&]()
-		{
-			if(InitialMatEditorInterface() == false)
-			{
-				return FReply::Handled();
-			}
-			auto& Ref = MatEditorInterface->GetMaterialInterface()->GetMaterial()->RefractionMethod;
-			if (Ref == RM_None)
-			{
-				Ref = RM_IndexOfRefraction;
-			}
-			else
-			{
-				Ref = RM_None;
-			}
-			MatEditorInterface->UpdateMaterialAfterGraphChange();
-			return FReply::Handled();
-		}))
+		.OnClicked_Raw(this,&SMatHelperWidget::ToggleRefraction)
 	];
 
 	AddSlot()
@@ -153,29 +136,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 		.Text(FText::FromString("Fix Function Node"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked(FOnClicked::CreateLambda([&]()
-		{
-			if(InitialMatEditorInterface() == false)
-			{
-				return FReply::Handled();
-			}
-			bool bNeedRefresh = false;
-			auto Nodes = MatEditorInterface->GetSelectedNodes().Array();
-			for(const auto Node : Nodes)
-			{
-				UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(Node);
-				if(Cast<UMaterialExpressionMaterialFunctionCall>(MatNode->MaterialExpression))
-				{
-					MatNode->RecreateAndLinkNode();
-					bNeedRefresh = true;
-				}
-			}
-			if(bNeedRefresh)
-			{
-				MatEditorInterface->UpdateMaterialAfterGraphChange();
-			}
-			return FReply::Handled();
-		}))
+		.OnClicked_Raw(this,&SMatHelperWidget::FixFunctionNode)
 	];
 
 	AddSlot()
@@ -217,7 +178,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 		.Text(FText::FromString("Refresh Button"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked(FOnClicked::CreateRaw(this,&SMatHelperWidget::InitialButton))
+		.OnClicked_Raw(this,&SMatHelperWidget::InitialButton)
 	];
 
 	
@@ -399,6 +360,12 @@ FReply SMatHelperWidget::AddNodeMaskPin()
 		}
 	case 8:
 		{
+			AddMaskPin(MatNode,"RG",FIntVector4(1,1,0,0),IsAddSuccess);
+			AddMaskPin(MatNode,"BA",FIntVector4(0,0,1,1),IsAddSuccess);
+			break;
+		}
+	case 9:
+		{
 			MatNode->MaterialExpression->bShowOutputNameOnPin = !MatNode->MaterialExpression->bShowOutputNameOnPin;
 			IsAddSuccess = true;
 			break;
@@ -491,6 +458,51 @@ FReply SMatHelperWidget::CreateInstance()
 	return FReply::Handled();
 }
 
+FReply SMatHelperWidget::ToggleRefraction()
+{
+	if(InitialMatEditorInterface() == false)
+	{
+		return FReply::Handled();
+	}
+	auto& Ref = MatEditorInterface->GetMaterialInterface()->GetMaterial()->RefractionMethod;
+	if (Ref == RM_None)
+	{
+		Ref = RM_IndexOfRefraction;
+	}
+	else
+	{
+		Ref = RM_None;
+	}
+	MatEditorInterface->UpdateMaterialAfterGraphChange();
+	return FReply::Handled();
+}
+
+FReply SMatHelperWidget::FixFunctionNode()
+{
+		
+	if(InitialMatEditorInterface() == false)
+	{
+		return FReply::Handled();
+	}
+	bool bNeedRefresh = false;
+	auto Nodes = MatEditorInterface->GetSelectedNodes().Array();
+	for(const auto Node : Nodes)
+	{
+		UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(Node);
+		if(Cast<UMaterialExpressionMaterialFunctionCall>(MatNode->MaterialExpression))
+		{
+			MatNode->RecreateAndLinkNode();
+			bNeedRefresh = true;
+		}
+	}
+	if(bNeedRefresh)
+	{
+		MatEditorInterface->UpdateMaterialAfterGraphChange();
+	}
+	return FReply::Handled();
+		
+}
+
 FReply SMatHelperWidget::InitialButton()
 {
 	
@@ -510,17 +522,19 @@ FReply SMatHelperWidget::InitialButton()
 		FString Key = FString::Printf(TEXT("%d"),i+1);
 		GConfig->GetString(L"name",*Key,ButtonName,FileName);
 		ButtonName = ButtonName.Len() == 0 ? "None" : ButtonName;
+		
 		TSharedPtr<SButton> Button = SNew(SButton)
 		.Text(FText::FromString(ButtonName))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
 		.OnClicked(FOnClicked::CreateRaw(this,&SMatHelperWidget::CreateMatNode,i+1));
-
+		
 		AddSlot()
 		.Padding(3.0f)
 		[
 			Button.ToSharedRef()
 		];
+		
 		NodeButtons.Add(Button);
 	}
 	return FReply::Handled();
@@ -538,18 +552,28 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 	{
 		return FReply::Handled();
 	}
+
 	
 	MatEditorInterface->FocusWindow();
 	auto SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
 	GConfig->LoadFile(ConfigFileName);
-	
-	FIntVector2 RootOffset = FIntVector2(100,800);
-	GConfig->GetInt(L"mgn",L"RootoffsetX",RootOffset.X,*ConfigFileName);
-	GConfig->GetInt(L"mgn",L"RootoffsetY",RootOffset.Y,*ConfigFileName);
 
-	FIntVector2 BaseOffset = FIntVector2(50,50);
-	GConfig->GetInt(L"mgn",L"BaseoffsetX",BaseOffset.X,*ConfigFileName);
-	GConfig->GetInt(L"mgn",L"BaseoffsetY",BaseOffset.Y,*ConfigFileName);
+	const FString NodeKey = FString::FromInt(Index);
+	const FString EnableRootKey = NodeKey + "E";
+	FVector2D RootOffset;
+	int32 EnableRootOverride = -97;
+	GConfig->GetInt(L"RootOffsetOverride",*EnableRootKey,EnableRootOverride,*ConfigFileName);
+	if(EnableRootOverride != -97 )
+	{
+		GConfig->GetVector2D(L"RootOffsetOverride",*NodeKey,RootOffset,*ConfigFileName);
+	}
+	else
+	{
+		GConfig->GetVector2D(L"mgn",L"RootOffset",RootOffset,*ConfigFileName);
+	}
+
+	FVector2D BaseOffset = FVector2D(50,50);
+	GConfig->GetVector2D(L"mgn",L"BaseOffset",BaseOffset,*ConfigFileName);
 	
 	if(SelectedNodes.Num() > 0)
 	{
@@ -567,14 +591,12 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 	}
 	else
 	{
-		MatEditorInterface->PasteNodesHere(FVector2D(464,1104));
+		auto BaseRootNode =  MatEditorInterface->GetMaterialInterface()->GetMaterial()->MaterialGraph->RootNode;
+		MatEditorInterface->PasteNodesHere(FVector2D(BaseRootNode->NodePosX + RootOffset.X,BaseRootNode->NodePosY + RootOffset.Y));
 		MatEditorInterface->JumpToExpression(Cast<UMaterialGraphNode>(MatEditorInterface->GetSelectedNodes().Array()[0])->MaterialExpression);
 	}
-	
-	
 	return FReply::Handled();
 }
-
 
 
 inline bool SMatHelperWidget::CheckNode(UObject* Node)

@@ -6,6 +6,8 @@
 #include "AssetDefinitionDefault.h"
 #include "CusAssetDefinition_Material.generated.h"
 
+
+
 /**
  * 
  */
@@ -16,7 +18,8 @@ class MATHELPER_API UCusAssetDefinition_Material : public UAssetDefinitionDefaul
 	GENERATED_BODY()
 public:
 	// UAssetDefinition Begin
-	FColor Color;
+	
+	FColor Color = FColor(64,192,64);
 	virtual FLinearColor GetAssetColor() const override;
 	virtual UThumbnailInfo* LoadThumbnailInfo(const FAssetData& InAsset) const override;
 	virtual FText GetAssetDisplayName() const override { return NSLOCTEXT("AssetTypeActions", "AssetTypeActions_Material", "Material"); }

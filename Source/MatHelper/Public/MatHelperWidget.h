@@ -8,8 +8,6 @@ class UMaterialGraphNode;
 class FMatHelperModule;
 class IMaterialEditor;
 
-
-
 class SMatHelperWidget : public SScrollBox
 {
 public:
@@ -38,6 +36,9 @@ private:
 	TSharedPtr<SEditableTextBox> InstanceText;
 	FReply CreateInstance();
 	FString MIEmptyPath = "/MatHelper/Material/MI_Empty";
+
+	FReply ToggleRefraction();
+	FReply FixFunctionNode();
 	
 	TArray<TSharedPtr<SButton>> NodeButtons;
 	FReply InitialButton();

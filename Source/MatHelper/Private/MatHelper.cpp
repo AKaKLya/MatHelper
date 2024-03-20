@@ -19,12 +19,12 @@ void FMatHelperModule::StartupModule()
 {
 	
 	PluginPath = IPluginManager::Get().FindPlugin("MatHelper")->GetBaseDir();
+
 	IMaterialEditorModule& MatInterface = IMaterialEditorModule::Get();
 	MatInterface.OnMaterialEditorOpened().AddLambda([&](const TWeakPtr<IMaterialEditor>& InMatEditor)
 	{
 		IMaterialEditor* MatEditor = InMatEditor.Pin().Get();
 		MatEditors.Add(InMatEditor);
-		
 		MatEditor->OnRegisterTabSpawners().AddLambda([&](const TSharedRef<class FTabManager>& TabManager)
 		{
 			const TSharedPtr<FWorkspaceItem> WorkspaceMenuCategory = TabManager->AddLocalWorkspaceMenuCategory(FText::FromString("Material Editor"));
@@ -54,6 +54,7 @@ void FMatHelperModule::StartupModule()
 	MaskPinOptions.Add(MakeShareable(new FString("RGBA")));
 	MaskPinOptions.Add(MakeShareable(new FString("RG")));
 	MaskPinOptions.Add(MakeShareable(new FString("BA")));
+	MaskPinOptions.Add(MakeShareable(new FString("RG - BA")));
 	MaskPinOptions.Add(MakeShareable(new FString("ShowName")));
 	
 }
