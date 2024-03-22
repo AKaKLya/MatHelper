@@ -46,6 +46,7 @@ EAssetCommandResult UCusAssetDefinition_Material::OpenAssets(const FAssetOpenArg
 	{
 		IMaterialEditorModule* MaterialEditorModule = &FModuleManager::LoadModuleChecked<IMaterialEditorModule>( "MaterialEditor" );
 		TSharedRef<IMaterialEditor> Interface = MaterialEditorModule->CreateMaterialEditor(OpenArgs.GetToolkitMode(), OpenArgs.ToolkitHost, Material);
+		//MatEditorOpenedEvent.Broadcast(Material,Interface);
 		FMatHelperModule::CreateMat(Material,Interface);
 	}
 

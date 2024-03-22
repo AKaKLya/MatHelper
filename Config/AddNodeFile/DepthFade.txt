@@ -1,0 +1,17 @@
+Begin Object Class=/Script/UnrealEd.MaterialGraphNode Name="MaterialGraphNode_7" ExportPath="/Script/UnrealEd.MaterialGraphNode'/Engine/Transient.NewMaterial7:MaterialGraph_0.MaterialGraphNode_7'"
+   Begin Object Class=/Script/Engine.MaterialExpressionDepthFade Name="MaterialExpressionDepthFade_0" ExportPath="/Script/Engine.MaterialExpressionDepthFade'/Engine/Transient.NewMaterial7:MaterialGraph_0.MaterialGraphNode_7.MaterialExpressionDepthFade_0'"
+   End Object
+   Begin Object Name="MaterialExpressionDepthFade_0" ExportPath="/Script/Engine.MaterialExpressionDepthFade'/Engine/Transient.NewMaterial7:MaterialGraph_0.MaterialGraphNode_7.MaterialExpressionDepthFade_0'"
+      MaterialExpressionEditorX=-333
+      MaterialExpressionEditorY=580
+      MaterialExpressionGuid=4A4BA0FE49E3BBB6915888B3DEB908D8
+      Material="/Script/UnrealEd.PreviewMaterial'/Engine/Transient.NewMaterial7'"
+   End Object
+   MaterialExpression="/Script/Engine.MaterialExpressionDepthFade'MaterialExpressionDepthFade_0'"
+   NodePosX=-333
+   NodePosY=580
+   NodeGuid=592B95A64B051EAE7C1FABAD8FE65852
+   CustomProperties Pin (PinId=FA053BED4B22F6069636989C2E906B38,PinName="Opacity",PinType.PinCategory="optional",PinType.PinSubCategory="red",PinType.PinSubCategoryObject=None,PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,DefaultValue="1.0",PersistentGuid=00000000000000000000000000000000,bHidden=False,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,)
+   CustomProperties Pin (PinId=EFB7C89D435B03F4CF69EEB2DA25047C,PinName="FadeDistance",PinType.PinCategory="optional",PinType.PinSubCategory="red",PinType.PinSubCategoryObject=None,PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,DefaultValue="100.0",PersistentGuid=00000000000000000000000000000000,bHidden=False,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,)
+   CustomProperties Pin (PinId=8FF537D94E9DC8D94A5F359683F5D6AF,PinName="Output",PinFriendlyName=NSLOCTEXT("MaterialGraphNode", "Space", " "),Direction="EGPD_Output",PinType.PinCategory="",PinType.PinSubCategory="",PinType.PinSubCategoryObject=None,PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,PersistentGuid=00000000000000000000000000000000,bHidden=False,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,)
+End Object

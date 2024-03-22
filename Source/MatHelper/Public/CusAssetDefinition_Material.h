@@ -18,7 +18,6 @@ class MATHELPER_API UCusAssetDefinition_Material : public UAssetDefinitionDefaul
 	GENERATED_BODY()
 public:
 	// UAssetDefinition Begin
-	
 	FColor Color = FColor(64,192,64);
 	virtual FLinearColor GetAssetColor() const override;
 	virtual UThumbnailInfo* LoadThumbnailInfo(const FAssetData& InAsset) const override;
@@ -30,4 +29,9 @@ public:
 		return Categories;
 	}
 	virtual EAssetCommandResult OpenAssets(const FAssetOpenArgs& OpenArgs) const override;
+	
+	/*DECLARE_EVENT_TwoParams(IMaterialEditorModule, FCusMatEditorOpenedEvent, UMaterial*,TSharedRef<IMaterialEditor>);
+	FCusMatEditorOpenedEvent& OnMaterialEditorOpened() { return MatEditorOpenedEvent; };
+private:
+	FCusMatEditorOpenedEvent MatEditorOpenedEvent;*/
 };

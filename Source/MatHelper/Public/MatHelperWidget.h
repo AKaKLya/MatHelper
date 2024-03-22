@@ -4,6 +4,8 @@
 #include "CoreMinimal.h"
 #include "Widgets/Layout/SScrollBox.h"
 
+struct FNodeButton;
+class UMatHelperMgn;
 class UMaterialGraphNode;
 class FMatHelperModule;
 class IMaterialEditor;
@@ -15,8 +17,10 @@ public:
 	SLATE_BEGIN_ARGS(SMatHelperWidget) {}
 	SLATE_END_ARGS()
 
-	void Construct(const FArguments& InArgs,UMaterial* InMaterial = nullptr);
+	void Construct(const FArguments& InArgs,IMaterialEditor* InMatEditor);
 	IMaterialEditor* MatEditorInterface = nullptr;
+	
+	
 	UMaterial* Material = nullptr;
 private:
 	bool InitialMatEditorInterface();
@@ -42,6 +46,6 @@ private:
 	
 	TArray<TSharedPtr<SButton>> NodeButtons;
 	FReply InitialButton();
-	FReply CreateMatNode(int32 Index);
-	
+	FReply CreateMatNode(FNodeButton ButtonInfo);
+	FReply RefreshButton();
 };

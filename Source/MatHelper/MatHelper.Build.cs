@@ -34,7 +34,7 @@ public class MatHelper : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core","AssetDefinition", "EngineAssetDefinitions",
+				"Core","AssetDefinition", "EngineAssetDefinitions", "MaterialEditor",
 				// ... add other public dependencies that you statically link with here ...
 			}
 		);

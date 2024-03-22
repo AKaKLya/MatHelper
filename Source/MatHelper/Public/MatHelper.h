@@ -10,8 +10,6 @@ class UMatHelperMgn;
 class SMatHelperWidget;
 class IMaterialEditor;
 
-
-
 class FMatHelperModule : public IModuleInterface
 {
 public:
@@ -25,6 +23,7 @@ public:
 	void EditorNotify(const FString&  NotifyInfo, SNotificationItem::ECompletionState State);
 	TArray<TSharedPtr<FString>> MaskPinOptions;
 	static void CreateMat(UMaterial* InMaterial,TWeakPtr<IMaterialEditor> InMatEditor);
+	UMatHelperMgn* MatHelperMgn; 
 private:
 	FString PluginPath;
 	TArray<TWeakPtr<IMaterialEditor>> MatEditors;

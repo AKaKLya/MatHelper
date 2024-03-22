@@ -1,5 +1,4 @@
 // Copyright AKaKLya 2024
-#define protected public
 
 #include "MatHelperWidget.h"
 
@@ -8,6 +7,7 @@
 #include "IContentBrowserSingleton.h"
 #include "MaterialGraphNode_Knot.h"
 #include "MatHelper.h"
+#include "MatHelperMgn.h"
 
 #include "Editor/MaterialEditor/Public/IMaterialEditor.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -27,10 +27,10 @@ namespace MatHelperWidget
 }
 using namespace MatHelperWidget;
 
-void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
+void SMatHelperWidget::Construct(const FArguments& InArgs,IMaterialEditor* InMatEditor)
 {
 	SScrollBox::Construct(SScrollBox::FArguments());
-	Material = InMaterial;
+	MatEditorInterface = InMatEditor;
 	
 	MatHelper = FModuleManager::Get().GetModuleChecked<FMatHelperModule>("MatHelper");
 	PluginConfigPath = MatHelper.GetPluginPath().Append("/Config/");
@@ -38,6 +38,20 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 	
 	SAssignNew(GroupText,SEditableTextBox);
 	SAssignNew(InstanceText,SEditableTextBox);
+
+	AddSlot()
+	.Padding(5.0f)
+	[
+		SNew(SButton)
+		.Text(FText::FromString("MatHelper Manager"))
+		.VAlign(VAlign_Center)
+		.HAlign(HAlign_Center)
+		.OnClicked_Lambda([]()
+		{
+			AssetViewUtils::OpenEditorForAsset("/MatHelper/MatHelper.MatHelper");
+			return FReply::Handled();
+		})
+	];
 	
 	
 	AddSlot()
@@ -138,38 +152,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 		.HAlign(HAlign_Center)
 		.OnClicked_Raw(this,&SMatHelperWidget::FixFunctionNode)
 	];
-
-	AddSlot()
-	.Padding(3.0f)
-	[
-		SNew(SButton)
-		.Text(FText::FromString("Edit Group"))
-		.VAlign(VAlign_Center)
-		.HAlign(HAlign_Center)
-		.OnClicked(FOnClicked::CreateLambda([&]()
-		{
-			FString Path = PluginConfigPath + "AutoGroup.ini";
-			Path.ReplaceCharInline('/','\\');
-			FWindowsPlatformProcess::CreateProc(L"notepad.exe",*Path,false,false,false,nullptr,0,nullptr,nullptr);
-			return FReply::Handled();
-		}))
-	];
 	
-	AddSlot()
-	.Padding(3.0f)
-	[
-		SNew(SButton)
-		.Text(FText::FromString("Open Config Folder"))
-		.VAlign(VAlign_Center)
-		.HAlign(HAlign_Center)
-		.OnClicked(FOnClicked::CreateLambda([&]()
-		{
-			FString Path = PluginConfigPath;
-			Path.ReplaceCharInline('/','\\');
-			FWindowsPlatformProcess::CreateProc(L"explorer.exe",*Path,false,false,false,nullptr,0,nullptr,nullptr);
-			return FReply::Handled();
-		}))
-	];
 	
 	AddSlot()
 	.Padding(3.0f)
@@ -178,7 +161,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,UMaterial* InMaterial)
 		.Text(FText::FromString("Refresh Button"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked_Raw(this,&SMatHelperWidget::InitialButton)
+		.OnClicked_Raw(this,&SMatHelperWidget::RefreshButton)
 	];
 
 	
@@ -227,12 +210,8 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup)
 		return FReply::Handled();
 	}
 	
-	TArray<FString> Names;
-	if(AutoGroup)
-	{
-		const FString AutoFile = PluginConfigPath + "AutoGroup.ini";
-		FFileHelper::LoadFileToStringArray(Names,*AutoFile);
-	}
+	TArray<FString> Names = MatHelper.MatHelperMgn->AutoGroupKeys;
+	
 	TArray<UObject*> SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
 	MatEditorInterface->FocusWindow();
 	
@@ -512,22 +491,16 @@ FReply SMatHelperWidget::InitialButton()
 	}
 	NodeButtons.Empty();
 	
-	int32 Num = 0;
-	const FString FileName = PluginConfigPath+"AddNodeInfo.ini";
-	GConfig->LoadFile(FileName);
-	GConfig->GetInt(L"mgn",L"Num",Num,FileName);
+	int32 Num = MatHelper.MatHelperMgn->NodeButtonInfo.Num();
+	
 	for(int i = 0 ; i < Num ; i++)
 	{
-		FString ButtonName;
-		FString Key = FString::Printf(TEXT("%d"),i+1);
-		GConfig->GetString(L"name",*Key,ButtonName,FileName);
-		ButtonName = ButtonName.Len() == 0 ? "None" : ButtonName;
-		
+		FNodeButton ButtonInfo = MatHelper.MatHelperMgn->NodeButtonInfo[i];
 		TSharedPtr<SButton> Button = SNew(SButton)
-		.Text(FText::FromString(ButtonName))
+		.Text(FText::FromString( ButtonInfo.ButtonName))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked(FOnClicked::CreateRaw(this,&SMatHelperWidget::CreateMatNode,i+1));
+		.OnClicked(FOnClicked::CreateRaw(this,&SMatHelperWidget::CreateMatNode,ButtonInfo));
 		
 		AddSlot()
 		.Padding(3.0f)
@@ -540,10 +513,10 @@ FReply SMatHelperWidget::InitialButton()
 	return FReply::Handled();
 }
 
-FReply SMatHelperWidget::CreateMatNode(int32 Index)
+FReply SMatHelperWidget::CreateMatNode(FNodeButton ButtonInfo)
 {
-	const FString ConfigFileName = PluginConfigPath + "AddNodeInfo.ini";
-	const FString NodeFileName = PluginConfigPath + "AddNodeFile/" + FString::FromInt(Index) + ".txt";
+	
+	const FString NodeFileName = PluginConfigPath + "AddNodeFile/" + ButtonInfo.ButtonName + ".txt";
 	FString NodeText;
 	FFileHelper::LoadFileToString(NodeText,*NodeFileName);
 	FPlatformApplicationMisc::ClipboardCopy(*NodeText);
@@ -556,24 +529,19 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 	
 	MatEditorInterface->FocusWindow();
 	auto SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
-	GConfig->LoadFile(ConfigFileName);
-
-	const FString NodeKey = FString::FromInt(Index);
-	const FString EnableRootKey = NodeKey + "E";
+	
 	FVector2D RootOffset;
-	int32 EnableRootOverride = -97;
-	GConfig->GetInt(L"RootOffsetOverride",*EnableRootKey,EnableRootOverride,*ConfigFileName);
-	if(EnableRootOverride != -97 )
+	if(ButtonInfo.RootOffsetOverride)
 	{
-		GConfig->GetVector2D(L"RootOffsetOverride",*NodeKey,RootOffset,*ConfigFileName);
+		RootOffset = ButtonInfo.RootOffset;
 	}
 	else
 	{
-		GConfig->GetVector2D(L"mgn",L"RootOffset",RootOffset,*ConfigFileName);
+		RootOffset = MatHelper.MatHelperMgn->RootOffset;
 	}
-
-	FVector2D BaseOffset = FVector2D(50,50);
-	GConfig->GetVector2D(L"mgn",L"BaseOffset",BaseOffset,*ConfigFileName);
+	
+	FVector2D BaseOffset = MatHelper.MatHelperMgn->BaseOffset;
+	
 	
 	if(SelectedNodes.Num() > 0)
 	{
@@ -595,6 +563,13 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 		MatEditorInterface->PasteNodesHere(FVector2D(BaseRootNode->NodePosX + RootOffset.X,BaseRootNode->NodePosY + RootOffset.Y));
 		MatEditorInterface->JumpToExpression(Cast<UMaterialGraphNode>(MatEditorInterface->GetSelectedNodes().Array()[0])->MaterialExpression);
 	}
+	return FReply::Handled();
+}
+
+FReply SMatHelperWidget::RefreshButton()
+{
+	
+	InitialButton();
 	return FReply::Handled();
 }
 

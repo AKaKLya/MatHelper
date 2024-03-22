@@ -1,9 +1,13 @@
 // Copyright AKaKLya 2024
 
 #include "MatHelper.h"
+
+#include "AssetDefinitionRegistry.h"
+#include "MatHelperMgn.h"
 #include "MatHelperWidget.h"
 #include "Editor/MaterialEditor/Public/IMaterialEditor.h"
 #include "Editor/MaterialEditor/Public/MaterialEditorModule.h"
+#include "CusAssetDefinition_Material.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Interfaces/IPluginManager.h"
 
@@ -19,7 +23,12 @@ void FMatHelperModule::StartupModule()
 {
 	
 	PluginPath = IPluginManager::Get().FindPlugin("MatHelper")->GetBaseDir();
-
+	MatHelperMgn = LoadObject<UMatHelperMgn>(nullptr,TEXT("/MatHelper/MatHelper.MatHelper"));
+	
+	const UCusAssetDefinition_Material* MaterialDefinition = Cast<UCusAssetDefinition_Material>(UAssetDefinitionRegistry::Get()->GetAssetDefinitionForClass(UMaterial::StaticClass()));
+	UCusAssetDefinition_Material* NonConstMaterialDefinition = const_cast<UCusAssetDefinition_Material*>(MaterialDefinition);
+	NonConstMaterialDefinition->Color = MatHelperMgn->MaterialAssetColor;
+	
 	IMaterialEditorModule& MatInterface = IMaterialEditorModule::Get();
 	MatInterface.OnMaterialEditorOpened().AddLambda([&](const TWeakPtr<IMaterialEditor>& InMatEditor)
 	{
@@ -32,8 +41,7 @@ void FMatHelperModule::StartupModule()
 		
 			TabManager->RegisterTabSpawner("MatHelper",FOnSpawnTab::CreateLambda([&](const FSpawnTabArgs& Args)
 			{
-				TSharedRef<SMatHelperWidget> MhWidget = SNew(SMatHelperWidget);
-				MhWidget->MatEditorInterface = MatEditor;
+				TSharedRef<SMatHelperWidget> MhWidget = SNew(SMatHelperWidget,MatEditor);
 				MhWidgets.Add(MhWidget);
 				TSharedRef<SDockTab> Dock = SNew(SDockTab)
 				[
