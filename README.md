@@ -14,4 +14,10 @@ Add [Edit Group Text] Button
 
 2024.3.20
 
-![97101ca3a7775983d7da259797f1ab9a](https://github.com/AKaKLya/MatHelper/assets/67385510/5f1def74-a1ef-47fd-ac84-d84a7815f1d5)
+FixBug
+
+2024.3.22
+
+Use DataAsset to define something.
+
+![image](https://github.com/AKaKLya/MatHelper/assets/67385510/2ffd15de-3c32-415c-85be-1bab28354c23)
