@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright AKaKLya 2024
 
 #pragma once
 
@@ -27,7 +27,7 @@ class MATHELPER_API UMatHelperMgn : public UDataAsset
 	GENERATED_BODY()
 	
 public:
-	FString PluginConfigPath;
+	FString PluginButtonConfigPath;
 	
 	UPROPERTY(EditAnywhere,Category = "Material")
 	FColor MaterialAssetColor = FColor(255,25,25);
@@ -40,6 +40,12 @@ public:
 
 	UFUNCTION(CallInEditor,Category = "Material")
 	void OpenNodesConfigFolder();
+	
+	UFUNCTION(CallInEditor,Category = "Material")
+	void EditButtonInfo();
+
+	UFUNCTION(CallInEditor,Category = "Material")
+	void RefreshHelpersButton();
 
 	UPROPERTY(EditAnywhere,Category = "Material")
 	TArray<FString> AutoGroupKeys;

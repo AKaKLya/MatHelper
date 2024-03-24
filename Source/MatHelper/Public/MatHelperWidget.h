@@ -3,6 +3,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Widgets/Layout/SScrollBox.h"
+#include "SMaterialPalette.h"
 
 struct FNodeButton;
 class UMatHelperMgn;
@@ -10,21 +11,24 @@ class UMaterialGraphNode;
 class FMatHelperModule;
 class IMaterialEditor;
 
-class SMatHelperWidget : public SScrollBox
+
+
+class SMatHelperWidget :public SMaterialPalette
 {
 public:
 
 	SLATE_BEGIN_ARGS(SMatHelperWidget) {}
 	SLATE_END_ARGS()
 
-	void Construct(const FArguments& InArgs,IMaterialEditor* InMatEditor);
-	IMaterialEditor* MatEditorInterface = nullptr;
+	void Construct(const FArguments& InArgs,FMaterialEditor* InMatEditor);
+	FReply InitialButton();
+	TSharedPtr<SGraphActionMenu> GraphActionMenu;
 	
-	
-	UMaterial* Material = nullptr;
 private:
-	bool InitialMatEditorInterface();
+	FMaterialEditor* MatEditorInterface = nullptr;
+	UMaterial* Material = nullptr;
 	
+	TSharedPtr<SScrollBox> NodeButtonScrollBox;
 	
 	FString PluginConfigPath;
 	inline bool CheckNode(UObject* Node);
@@ -40,12 +44,24 @@ private:
 	TSharedPtr<SEditableTextBox> InstanceText;
 	FReply CreateInstance();
 	FString MIEmptyPath = "/MatHelper/Material/MI_Empty";
-
-	FReply ToggleRefraction();
-	FReply FixFunctionNode();
 	
+	FReply FixFunctionNode();
+	FReply ToggleRefraction();
 	TArray<TSharedPtr<SButton>> NodeButtons;
-	FReply InitialButton();
-	FReply CreateMatNode(FNodeButton ButtonInfo);
+	
+	FReply CreateMatNode(int32 Index);
 	FReply RefreshButton();
+
+	
+protected:
+	// SMaterialPalette Function  Begin
+	virtual TSharedRef<SWidget> OnCreateWidgetForAction(FCreateWidgetForActionData* const InCreateData) override;
+	virtual void CollectAllActions(FGraphActionListBuilderBase& OutAllActions) override;
+	virtual FReply OnActionDragged(const TArray< TSharedPtr<FEdGraphSchemaAction> >& InActions, const FPointerEvent& MouseEvent) override;
+	
+	void MHCategorySelectionChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
+	void MHRefreshAssetInRegistry(const FAssetData& InAddedAssetData);
+	FString MHGetFilterCategoryName() const;
+	TSharedPtr<STextComboBox> CategoryComboBox;
+   // SMaterialPalette Function End
 };

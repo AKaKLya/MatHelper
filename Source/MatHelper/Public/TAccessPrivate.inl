@@ -20,6 +20,22 @@ struct TAccessPrivateStub
 	static inline FAccessPrivateStub AccessPrivateStub;
 };
 
+// Protected Member Access 2
+#define PROTECTED_MEMBER_ACCESS_FUNCTION_DEFINE(ClassType,MemberName) \
+class ClassType##_##MemberName##_Accessor : public ClassType\
+{\
+public:\
+typedef decltype(MemberName) MemberType;\
+MemberType Get() { return MemberName; }\
+};\
+ClassType##_##MemberName##_Accessor::MemberType Get_##ClassType##_##MemberName(ClassType* origin)\
+{\
+ClassType##_##MemberName##_Accessor* Accessor = (ClassType##_##MemberName##_Accessor*)origin;\
+return Accessor->Get();\
+}\
+
+
+
 template<typename Tag>
 struct result {
 	/* export it ... */
