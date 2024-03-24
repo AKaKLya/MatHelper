@@ -23,7 +23,7 @@ Use DataAsset to define something.
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/2ffd15de-3c32-415c-85be-1bab28354c23)
 
 
-2024.3.24
+2024.3.24  Update to V4.0
 
 Extend Palette Tool
 
