@@ -55,7 +55,7 @@ public class MatHelper : ModuleRules
 				"AssetTools",
 				"EngineAssetDefinitions", "CurveAssetEditor",
 				"CurveEditor", "GraphEditor",
-				"EditorWidgets",
+				"EditorWidgets","ToolMenus"
 				// ... add private dependencies that you statically link with here ...	
 			}
 		);

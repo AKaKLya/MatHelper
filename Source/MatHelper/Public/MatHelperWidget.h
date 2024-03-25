@@ -63,5 +63,5 @@ protected:
 	void MHRefreshAssetInRegistry(const FAssetData& InAddedAssetData);
 	FString MHGetFilterCategoryName() const;
 	TSharedPtr<STextComboBox> CategoryComboBox;
-   // SMaterialPalette Function End
+	// SMaterialPalette Function End
 };

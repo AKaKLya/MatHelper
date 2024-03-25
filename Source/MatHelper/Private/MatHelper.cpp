@@ -6,14 +6,16 @@
 #include "ButtonInfoEditor.h"
 #include "MatHelperMgn.h"
 #include "MatHelperWidget.h"
-#include "Editor/MaterialEditor/Public/IMaterialEditor.h"
-#include "Editor/MaterialEditor/Public/MaterialEditorModule.h"
+#include "IMaterialEditor.h"
+#include "MaterialEditorModule.h"
 #include "EngineClass/CusAssetDefinition_Material.h"
-#include "Editor/MaterialEditor/Private/MaterialEditor.h"
-#include "Editor/MaterialEditor/Private/SMaterialPalette.h"
+#include "MaterialEditor.h"
+#include "MaterialInstanceEditor.h"
+#include "MatInstanceHelper.h"
+#include "SMaterialPalette.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Interfaces/IPluginManager.h"
-#include "Widgets/SCompoundWidget.h"
+
 #define LOCTEXT_NAMESPACE "FMatHelperModule"
 
 namespace MatHelperSpace
@@ -22,11 +24,6 @@ namespace MatHelperSpace
 }
 using namespace MatHelperSpace;
 
-FMatHelperModule& FMatHelperModule::Get()
-{
-	return FModuleManager::Get().GetModuleChecked<FMatHelperModule>("MatHelper");
-}
-
 struct AccessPalatte
 {
 	typedef TSharedPtr<class SMaterialPalette> (FMaterialEditor::*Type);
@@ -34,8 +31,13 @@ struct AccessPalatte
 
 template struct TAccessPrivateStub<AccessPalatte,&FMaterialEditor::Palette>;
 
+//PROTECTED_MEMBER_ACCESS_FUNCTION_DEFINE(SMaterialPalette,MaterialEditorPtr)
 
-PROTECTED_MEMBER_ACCESS_FUNCTION_DEFINE(SMaterialPalette,MaterialEditorPtr)
+FMatHelperModule& FMatHelperModule::Get()
+{
+	return FModuleManager::Get().GetModuleChecked<FMatHelperModule>("MatHelper");
+}
+
 
 void FMatHelperModule::StartupModule()
 {
@@ -60,16 +62,34 @@ void FMatHelperModule::StartupModule()
 		TSharedPtr<SMaterialPalette>& Palette = MatEditor->*TAccessPrivate<AccessPalatte>::Value;
 		
 		
-		MatEditors.Add(InMatEditor);
+	//	MatEditors.Add(InMatEditor);
 		
 		IMatEditor->OnRegisterTabSpawners().AddLambda([&](const TSharedRef<class FTabManager>& TabManager)
 		{
-			const TSharedPtr<FWorkspaceItem> WorkspaceMenuCategory = TabManager->AddLocalWorkspaceMenuCategory(FText::FromString("Material Editor"));
 			auto MhWidget = SNew(SMatHelperWidget,MatEditor);
 			MhWidgets.Add(MhWidget);
 			Palette =  MhWidget;
 		});
 	});
+	
+/*	MatInterface.OnMaterialInstanceEditorOpened().AddLambda([&](const TWeakPtr<IMaterialEditor>& InMatEditor)
+	{
+		IMaterialEditor* IMatEditor = InMatEditor.Pin().Get();
+		FMaterialEditor* MatEditor = static_cast<FMaterialEditor*>(IMatEditor);
+		TSharedRef<SMatInstanceHelper> MhWidget = SNew(SMatInstanceHelper,IMatEditor);
+		auto TabManager = IMatEditor->GetTabManager();
+		const TSharedPtr<FWorkspaceItem> WorkspaceMenuCategory = TabManager->AddLocalWorkspaceMenuCategory(FText::FromString("Material Editor"));
+		TabManager->RegisterTabSpawner("MatHelper",FOnSpawnTab::CreateLambda([&](const FSpawnTabArgs& Args)
+		{
+			TSharedRef<SDockTab> Dock = SNew(SDockTab)
+			[
+				MhWidget
+			];
+				return Dock;
+			}))
+		.SetGroup(WorkspaceMenuCategory.ToSharedRef())
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "Kismet.Tabs.Palette"));
+	});*/
 }
 
 void FMatHelperModule::ShutdownModule()

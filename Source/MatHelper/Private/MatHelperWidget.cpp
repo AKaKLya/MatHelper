@@ -63,8 +63,9 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		
 			SNew(SVerticalBox)
 			+SVerticalBox::Slot()
-			.AutoHeight()
+			.FillHeight(MatHelper.MatHelperMgn->HeightRatio)
 			[
+			
 				NodeButtonScrollBox.ToSharedRef()
 			]
 
@@ -454,8 +455,8 @@ FReply SMatHelperWidget::CreateInstance()
 	}
 	UMaterialInstance* NewMi = Cast<UMaterialInstance>(EditorAssetSubsystem->DuplicateAsset(MIEmptyPath, NewPath));
 	NewMi->Parent=Material;
+	
 	UMaterialInstanceConstant* ConstMat = static_cast<UMaterialInstanceConstant*>(NewMi);
-
 	const auto MaterialEditorInstance = NewObject<UMaterialEditorInstanceConstant>(GetTransientPackage(), NAME_None, RF_Transactional);
 	MaterialEditorInstance->SetSourceInstance(ConstMat);
 	for (int32 GroupIdx = 0; GroupIdx < MaterialEditorInstance->ParameterGroups.Num(); ++GroupIdx)
@@ -585,7 +586,7 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 
 	const FVector2D BaseOffset = MatHelper.MatHelperMgn->BaseOffset;
 	
-	
+
 	if(SelectedNodes.Num() > 0)
 	{
 		UObject* SelectedNode = SelectedNodes[0];
@@ -604,8 +605,21 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 	{
 		const auto BaseRootNode =  MatEditorInterface->GetMaterialInterface()->GetMaterial()->MaterialGraph->RootNode;
 		MatEditorInterface->PasteNodesHere(FVector2D(BaseRootNode->NodePosX + RootOffset.X,BaseRootNode->NodePosY + RootOffset.Y));
-		MatEditorInterface->JumpToExpression(Cast<UMaterialGraphNode>(MatEditorInterface->GetSelectedNodes().Array()[0])->MaterialExpression);
 	}
+	
+	auto NewNodes = MatEditorInterface->GetSelectedNodes().Array();
+	for(const auto Node : NewNodes)
+	{
+		UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(Node);
+		if(Cast<UMaterialExpressionMaterialFunctionCall>(MatNode->MaterialExpression))
+		{
+			MatNode->RecreateAndLinkNode();
+		}
+	}
+	//MatEditorInterface->JumpToExpression(Cast<UMaterialGraphNode>(NewNodes[0])->MaterialExpression);
+
+		
+	
 	return FReply::Handled();
 }
 

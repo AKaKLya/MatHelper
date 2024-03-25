@@ -25,7 +25,7 @@ public:
 	FString GetPluginPath() {return PluginPath;};
 	TSharedRef<SDockTab> OnSpawnButtonInfoEditor(const FSpawnTabArgs& SpawnTabArgs);
 	inline static const FName ButtonInfoEditorTabName = "ButtonInfoEditor";
-	TArray<TWeakPtr<IMaterialEditor>> GetMatEditors(){ return MatEditors;};
+	//TArray<TWeakPtr<IMaterialEditor>> GetMatEditors(){ return MatEditors;};
 	
 	inline static FString CurrentCreateInstanceName = "";
 	UMatHelperMgn* MatHelperMgn;
@@ -33,6 +33,6 @@ public:
 	
 private:
 	FString PluginPath;
-	TArray<TWeakPtr<IMaterialEditor>> MatEditors;
+	//TArray<TWeakPtr<IMaterialEditor>> MatEditors;
 	void InitialMaskOptions();
 };

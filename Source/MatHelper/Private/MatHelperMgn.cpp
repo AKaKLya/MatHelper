@@ -32,6 +32,11 @@ void UMatHelperMgn::RefreshHelpersButton()
 	FMatHelperModule::RefreshAllWidgetButton();
 }
 
+void UMatHelperMgn::RestartEditor()
+{
+	FUnrealEdMisc::Get().RestartEditor(false);
+}
+
 /*
 void UMatHelperMgn::CreateButtonFile()
 {
