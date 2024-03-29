@@ -32,8 +32,11 @@ Extend Palette Tool
 
 ## 2024.3.29
 不需要再按 ? 键
+
 增加Niagara播放按钮
+
 在世界大纲里勾选Niagara旁边的勾之后，会在这个NiagaraActor里添加一个Tag.
+
 按下播放按钮时，检测是否存在这个Tag, 如果存在 就播放.
 
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/0288b9f7-5df1-44cd-bd6c-54c824268f6c)
