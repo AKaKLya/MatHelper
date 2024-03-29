@@ -29,16 +29,17 @@ private:
 	UMaterial* Material = nullptr;
 	
 	TSharedPtr<SScrollBox> NodeButtonScrollBox;
+
 	
 	FString PluginConfigPath;
 	inline bool CheckNode(UObject* Node);
 	
 	TSharedPtr<SEditableTextBox> GroupText;
-	FReply SetNodeGroup(bool AutoGroup);
+	FReply SetNodeGroup(bool AutoGroup,bool AllGroup);
 	
 	//TSharedPtr<SEditableTextBox> MaskPinText;
 	FReply AddNodeMaskPin();
-	inline void AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask, bool& Out_IsAddSuccess);
+	void AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask, bool& Out_IsAddSuccess);
 	int CurrentSelect = 0;
 
 	TSharedPtr<SEditableTextBox> InstanceText;
@@ -51,7 +52,7 @@ private:
 	
 	FReply CreateMatNode(int32 Index);
 	FReply RefreshButton();
-
+	FReply RemoveParameterType();
 	
 protected:
 	// SMaterialPalette Function  Begin

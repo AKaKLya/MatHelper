@@ -1,6 +1,7 @@
 // Copyright AKaKLya 2024
 
 #include "MatHelperWidget.h"
+#include "TAccessPrivate.inl"
 #include "AssetViewUtils.h"
 #include "EditorWidgetsModule.h"
 #include "GraphEditorDragDropAction.h"
@@ -25,13 +26,17 @@
 #include "Widgets/Input/STextComboBox.h"
 #include "Windows/WindowsPlatformApplicationMisc.h"
 
-namespace MatHelperWidget
-{
-	FMatHelperModule MatHelper;
-}
-using namespace MatHelperWidget;
+
 
 #define LOCTEXT_NAMESPACE "MaterialPalette"
+
+struct AccessGraph
+{
+	typedef TWeakPtr<class SGraphEditor> (FMaterialEditor::*Type);
+};
+
+template struct TAccessPrivateStub<AccessGraph,&FMaterialEditor::FocusedGraphEdPtr>;
+
 
 
 void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMatEditor)
@@ -42,8 +47,8 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 	CategoryNames.Add(MakeShareable(new FString(TEXT("All"))));
 	CategoryNames.Add(MakeShareable(new FString(TEXT("Expressions"))));
 	CategoryNames.Add(MakeShareable(new FString(TEXT("Functions"))));
-	
-	MatHelper = FMatHelperModule::Get();
+
+	FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	
 	MatEditorInterface = InMatEditor;
 	Material = Cast<UMaterial>(MatEditorInterface->OriginalMaterialObject);
@@ -54,6 +59,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 	SAssignNew(InstanceText,SEditableTextBox);
 	SAssignNew(NodeButtonScrollBox,SScrollBox);
 
+	
 	this->ChildSlot
 	[
 		SNew(SBorder)
@@ -152,7 +158,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.Text(FText::FromString("Set Group"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked_Raw(this,&SMatHelperWidget::SetNodeGroup,false)
+		.OnClicked_Raw(this,&SMatHelperWidget::SetNodeGroup,false,false)
 	];
 
 	NodeButtonScrollBox->AddSlot()
@@ -162,7 +168,27 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.Text(FText::FromString("Auto Group"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked_Raw(this,&SMatHelperWidget::SetNodeGroup,true)
+		.OnClicked_Raw(this,&SMatHelperWidget::SetNodeGroup,true,false)
+	];
+
+	NodeButtonScrollBox->AddSlot()
+	.Padding(3.0f)
+	[
+		SNew(SButton)
+		.Text(FText::FromString("Auto Name"))
+		.VAlign(VAlign_Center)
+		.HAlign(HAlign_Center)
+		.OnClicked_Raw(this,&SMatHelperWidget::RemoveParameterType)
+	];
+
+	NodeButtonScrollBox->AddSlot()
+	.Padding(3.0f)
+	[
+		SNew(SButton)
+		.Text(FText::FromString("Auto All Group"))
+		.VAlign(VAlign_Center)
+		.HAlign(HAlign_Center)
+		.OnClicked_Raw(this,&SMatHelperWidget::SetNodeGroup,true,true)
 	];
 	
 
@@ -215,6 +241,8 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.HAlign(HAlign_Center)
 		.OnClicked_Raw(this,&SMatHelperWidget::CreateInstance)
 	];
+
+	
 	
 
 	NodeButtonScrollBox->AddSlot()
@@ -236,15 +264,25 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.HAlign(HAlign_Center)
 		.OnClicked_Raw(this,&SMatHelperWidget::RefreshButton)
 	];
-	
+
+
 	
 	InitialButton();
 }
 
-FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup)
+FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup,bool AllGroup)
 {
 	bool ShouldRefresh = false;
-	
+
+	if(AllGroup == true)
+	{
+		auto GraphEdPtr =  MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
+		if(auto GraphEd = GraphEdPtr.Pin().Get())
+		{
+			GraphEd->SelectAllNodes();
+		}
+	}
+	FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	TArray<FString> Names = MatHelper.MatHelperMgn->AutoGroupKeys;
 	
 	TArray<UObject*> SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
@@ -378,6 +416,23 @@ FReply SMatHelperWidget::AddNodeMaskPin()
 			IsAddSuccess = true;
 			break;
 		}
+	case 10:
+		{
+			TArray<FExpressionOutput>& Outputs = MatNode->MaterialExpression->Outputs;
+			Outputs.Empty();
+			IsAddSuccess = true;
+			break;
+		}
+	case 11:
+		{
+			TArray<FExpressionOutput>& Outputs = MatNode->MaterialExpression->Outputs;
+			Outputs.Empty();
+			AddMaskPin(MatNode,"RG",FIntVector4(1,1,0,0),IsAddSuccess);
+			AddMaskPin(MatNode,"BA",FIntVector4(0,0,1,1),IsAddSuccess);
+			MatNode->MaterialExpression->bShowOutputNameOnPin = !MatNode->MaterialExpression->bShowOutputNameOnPin;
+			IsAddSuccess = true;
+			break;
+		}
 	default: break;
 	}
 	
@@ -390,7 +445,7 @@ FReply SMatHelperWidget::AddNodeMaskPin()
 	return FReply::Handled();
 }
 
-inline void SMatHelperWidget::AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask,bool& Out_IsAddSuccess)
+void SMatHelperWidget::AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask,bool& Out_IsAddSuccess)
 {
 	const TObjectPtr<UMaterialExpression> Expression = MatNode->MaterialExpression;
 	TArray<FExpressionOutput>& Outputs = Expression->Outputs;
@@ -421,6 +476,7 @@ inline void SMatHelperWidget::AddMaskPin(const UMaterialGraphNode* MatNode, cons
 
 FReply SMatHelperWidget::CreateInstance()
 {
+	FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	FString TargetPath = Material->GetPathName();
 	const FString BaseName = Material->GetName();
 	TargetPath.ReplaceInline(*BaseName,*FString(""));
@@ -496,7 +552,7 @@ FReply SMatHelperWidget::ToggleRefraction()
 
 FReply SMatHelperWidget::FixFunctionNode()
 {
-	
+	FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	bool bNeedRefresh = false;
 	auto Nodes = MatEditorInterface->GetSelectedNodes().Array();
 	for(const auto Node : Nodes)
@@ -520,7 +576,7 @@ FReply SMatHelperWidget::FixFunctionNode()
 
 FReply SMatHelperWidget::InitialButton()
 {
-	
+	FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	for(auto Button : NodeButtons)
 	{
 		NodeButtonScrollBox->RemoveSlot(Button.ToSharedRef());
@@ -551,7 +607,7 @@ FReply SMatHelperWidget::InitialButton()
 
 FReply SMatHelperWidget::CreateMatNode(int32 Index)
 {
-	
+	FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	const FString NodeFileName = PluginConfigPath + "AddNodeFile/" + MatHelper.MatHelperMgn->NodeButtonInfo[Index].ButtonName + ".txt";
 
 	const bool Exist = FPaths::FileExists(NodeFileName);
@@ -625,8 +681,75 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 
 FReply SMatHelperWidget::RefreshButton()
 {
-	
 	InitialButton();
+	return FReply::Handled();
+}
+
+FReply SMatHelperWidget::RemoveParameterType()
+{
+	bool ShouldRefresh = false;
+	auto GraphEdPtr =  MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
+	if(auto GraphEd = GraphEdPtr.Pin().Get())
+	{
+		GraphEd->SelectAllNodes();
+	}
+
+	auto SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
+
+	for(auto Node : SelectedNodes)
+	{
+		if(auto MatNode = Cast<UMaterialGraphNode>(Node))
+		{
+			if(CheckNode(MatNode) == false)
+			{
+				continue;
+			}
+			if(UMaterialExpressionParameter* Parameter = Cast<UMaterialExpressionParameter>(MatNode->MaterialExpression))
+			{
+				FString Name = Parameter->ParameterName.ToString();
+				if(Name.Contains(" (V2)"))
+				{
+					Name.ReplaceInline(TEXT(" (V2)"),TEXT(""));
+					goto End;
+				}
+				if(Name.Contains((" (V3)")))
+				{
+					Name.ReplaceInline(TEXT(" (V3)"),TEXT(""));
+					goto End;
+				}
+				if(Name.Contains((" (V4)")))
+				{
+					Name.ReplaceInline(TEXT(" (V4)"),TEXT(""));
+					goto End;
+				}
+				if(Name.Contains((" (S)")))
+				{
+					Name.ReplaceInline(TEXT(" (S)"),TEXT(""));
+					goto End;
+				}
+				if(Name.Contains((" (T2d)")))
+				{
+					Name.ReplaceInline(TEXT(" (T2d)"),TEXT(""));
+					goto End;
+				}
+				if(Name.Contains((" (SB)")))
+				{
+					Name.ReplaceInline(TEXT(" (SB)"),TEXT(""));
+					goto End;
+				}
+				
+				End:
+				ShouldRefresh = true;
+				Parameter->ParameterName = *Name;
+			}
+			
+		}
+	}
+	
+	if(ShouldRefresh)
+	{
+		MatEditorInterface->UpdateMaterialAfterGraphChange();
+	}
 	return FReply::Handled();
 }
 

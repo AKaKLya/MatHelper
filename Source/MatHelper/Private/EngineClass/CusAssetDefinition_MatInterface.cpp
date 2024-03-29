@@ -4,7 +4,7 @@
 #include "EngineClass/CusAssetDefinition_MatInterface.h"
 
 #include "ContentBrowserMenuContexts.h"
-#include "CusFactory_MatInterface.h"
+#include "EngineClass/CusFactory_MatInterface.h"
 #include "IAssetTools.h"
 #include "Factories/MaterialInstanceConstantFactoryNew.h"
 #include "Materials/MaterialInstanceConstant.h"
