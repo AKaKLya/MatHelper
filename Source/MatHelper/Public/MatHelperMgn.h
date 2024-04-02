@@ -34,7 +34,7 @@ class MATHELPER_API UMatHelperMgn : public UDataAsset
 	
 public:
 	FString PluginButtonConfigPath;
-
+	
 	// 打开节点配置文件夹
 	UFUNCTION(CallInEditor,Category = "Material")
 	void OpenNodesConfigFolder();
@@ -90,4 +90,7 @@ public:
 	// 设置更改后需要重启引擎.
 	UPROPERTY(EditAnywhere,Category = "Niagara")
 	bool OverrideNiagaraSequenceMode = true;
+
+	UPROPERTY(EditAnywhere,Category = "Niagara")
+	bool CreateNiagaraAutoPlaySelection = true;
 };

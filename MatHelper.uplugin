@@ -10,7 +10,7 @@
 	"DocsURL": "https://github.com/AKaKLya/MatHelper/wiki/MatHelper-Docs",
 	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/afaa7dd4ea414a929553ae9d06059d33",
 	"SupportURL": "",
-	"EngineVersion": "5.3.0",
+	"EngineVersion": "5.4.0",
 	"CanContainContent": true,
 	"Installed": true,
 	"Modules": [
@@ -26,6 +26,10 @@
 	"Plugins": [
 		{
 			"Name": "EngineAssetDefinitions",
+			"Enabled": true
+		},
+		{
+			"Name": "Niagara",
 			"Enabled": true
 		}
 	]

@@ -241,9 +241,16 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.HAlign(HAlign_Center)
 		.OnClicked_Raw(this,&SMatHelperWidget::CreateInstance)
 	];
-
 	
-	
+	NodeButtonScrollBox->AddSlot()
+    	.Padding(3.0f)
+    	[
+    		SNew(SButton)
+    		.Text(FText::FromString("Refraction"))
+    		.VAlign(VAlign_Center)
+    		.HAlign(HAlign_Center)
+    		.OnClicked_Raw(this,&SMatHelperWidget::ToggleRefraction)
+    	];
 
 	NodeButtonScrollBox->AddSlot()
 	.Padding(3.0f)
@@ -444,6 +451,7 @@ FReply SMatHelperWidget::AddNodeMaskPin()
 	}
 	return FReply::Handled();
 }
+
 
 void SMatHelperWidget::AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask,bool& Out_IsAddSuccess)
 {

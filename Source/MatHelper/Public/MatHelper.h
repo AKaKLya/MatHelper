@@ -19,7 +19,7 @@ class IMaterialEditor;
 class FMatHelperModule : public IModuleInterface
 {
 public:
-	inline static FMatHelperModule& Get();
+	static FMatHelperModule& Get();
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
 	void EditorNotify(const FString&  NotifyInfo, SNotificationItem::ECompletionState State);
@@ -33,15 +33,16 @@ public:
 	inline static FString CurrentCreateInstanceName = "";
 	UMatHelperMgn* MatHelperMgn;
 	TArray<TSharedPtr<FString>> MaskPinOptions;
-	
+	static TSharedRef<ISceneOutlinerColumn> OnCreateOutlinerColumn(ISceneOutliner& SceneOutliner);
 	void ProcessLockingForOutliner(AActor* ActorToProcess,bool bShouldLock);
 private:
 	FString PluginPath;
-	void InitialMaskOptions();
+	void TestLog(UToolMenu* Menu);
 	void RegisterButton();
-
+	void RegisterNiagaraAutoPlayer();
+	void ToggleAssetFlag(bool bIsLock);
 	//TSharedPtr<class FUICommandList> PluginCommands;
-	TSharedRef<ISceneOutlinerColumn> OnCreateOutlinerColumn(ISceneOutliner& SceneOutliner);
+	
 	TSharedPtr<class FUICommandList> PlayNiagaraCommands;
 	void PlayNiagaraOnEditorWorld();
 	

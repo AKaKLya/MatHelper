@@ -32,6 +32,8 @@ void UMatHelperMgn::ModifyICON()
 	AssetViewUtils::OpenEditorForAsset(this);
 }
 
+
+
 void UMatHelperMgn::OpenNodesConfigFolder()
 {
 	FString Path = PluginButtonConfigPath;
