@@ -43,7 +43,10 @@ Extend Palette Tool
 
 ## V5.0
 
-增加 资产解锁 Lock/UnLock 功能， 选中资产 -> 点击Lock ，这个资产就不能被右键Export导出.
+增加 资产解锁 Lock/UnLock 功能， 
+
+选中资产 -> 点击Lock ，这个资产就不能被右键Export导出.
+
 反之，UnLock 可以解锁资产，不能导出的资产 也能导出了. 例如 虚幻争霸的贴图, UnLock后就可以导出.
 
 增加 中英语言切换、 重启引擎
