@@ -41,3 +41,13 @@ Extend Palette Tool
 
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/0288b9f7-5df1-44cd-bd6c-54c824268f6c)
 
+## V5.0
+
+增加 资产解锁 Lock/UnLock 功能， 选中资产 -> 点击Lock ，这个资产就不能被右键Export导出.
+反之，UnLock 可以解锁资产，不能导出的资产 也能导出了. 例如 虚幻争霸的贴图, UnLock后就可以导出.
+
+增加 中英语言切换、 重启引擎
+
+
+![Tool](https://github.com/AKaKLya/MatHelper/assets/67385510/b671552f-21a5-4680-9a17-a0df048bcdc9)
+
