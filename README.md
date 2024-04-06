@@ -72,7 +72,7 @@ Tool 工具栏:
 修复 [Create Material Instance 2] 造成的资产不显示的问题.
 
 
-## V6.0 完结
+## V6.0 
 
 可自定义配置的[Mask Pin]
 
