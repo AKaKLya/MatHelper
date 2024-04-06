@@ -80,7 +80,7 @@ Tool 工具栏:
 
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/f602eb33-7b6b-4634-be03-de1baed0d14b)
 
-## V6.1
+## V6.1 插件完结.
 ### 虚幻商城:等待更新
 
 增加 [材质实例编辑器] 开启/关闭所有参数 按钮,
