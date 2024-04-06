@@ -93,7 +93,11 @@ Tool 工具栏:
 
 可以从虚幻商城下载安装， 也可以下载插件 重新编译出5.3版本的.
 
-编译时 要把MatHelper.uplugin 的 "EngineVersion": "5.4.0", 修改为 "EngineVersion": "5.3.0".
+1.下载 V6.0-UE5.3 版本 和 V6.1-UE5.4 版本的插件
+
+2. 用 6.1 的 Source 文件夹，替换 6.0 的 Source 文件夹
+
+3.编译时 要把MatHelper.uplugin 的 "EngineVersion": "5.4.0", 修改为 "EngineVersion": "5.3.0".
 
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/5057d5ad-8d1e-4525-8788-c881fb9d4119)
 
