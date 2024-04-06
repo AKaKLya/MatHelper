@@ -63,7 +63,7 @@ public class MatHelper : ModuleRules
 				"EngineAssetDefinitions", "CurveAssetEditor",
 				"CurveEditor", "GraphEditor",
 				"EditorWidgets","ToolMenus","EditorStyle","DeveloperSettings", "StaticMeshEditor", "LevelSequence", "NiagaraEditor", "Niagara", "Sequencer",
-				"MovieScene","SceneOutliner",
+				"MovieScene","SceneOutliner","PropertyEditor","RenderCore",
 				// ... add private dependencies that you statically link with here ...	
 			}
 		);

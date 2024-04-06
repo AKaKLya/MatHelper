@@ -31,4 +31,5 @@ public:
 	virtual EAssetCommandResult OpenAssets(const FAssetOpenArgs& OpenArgs) const override;
 	virtual bool CanImport() const override { return true; }
 	// UAssetDefinition End
+	
 };
