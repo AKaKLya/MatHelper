@@ -79,3 +79,16 @@ Tool 工具栏:
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/d964a077-522e-4564-b3a1-0a7ac710144a)
 
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/f602eb33-7b6b-4634-be03-de1baed0d14b)
+
+## V6.1
+
+增加 [材质实例编辑器] 开启/关闭所有参数 按钮,
+
+点击 开启所有参数，再点 关闭所有参数. 有时会卡住 多点两下就行.
+
+5.3版本没有编译，但是稍后会上传到虚幻商城，可以从虚幻商城下载安装， 也可以下载源码编译.
+
+编译时 要把MatHelper.uplugin 的 "EngineVersion": "5.4.0", 修改为 "EngineVersion": "5.3.0".
+
+![image](https://github.com/AKaKLya/MatHelper/assets/67385510/5057d5ad-8d1e-4525-8788-c881fb9d4119)
+
