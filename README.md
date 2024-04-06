@@ -66,6 +66,16 @@ Tool 工具栏:
 
 创建节点时,自动跳转到最新创建的节点.
 
+
 ## V5.1.1
 
 修复 [Create Material Instance 2] 造成的资产不显示的问题.
+
+
+## V6.0 完结
+
+可自定义配置的[Mask Pin]
+
+![image](https://github.com/AKaKLya/MatHelper/assets/67385510/d964a077-522e-4564-b3a1-0a7ac710144a)
+
+![image](https://github.com/AKaKLya/MatHelper/assets/67385510/f602eb33-7b6b-4634-be03-de1baed0d14b)
