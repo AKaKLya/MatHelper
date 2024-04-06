@@ -47,7 +47,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 	CategoryNames.Add(MakeShareable(new FString(TEXT("All"))));
 	CategoryNames.Add(MakeShareable(new FString(TEXT("Expressions"))));
 	CategoryNames.Add(MakeShareable(new FString(TEXT("Functions"))));
-
+	
 	FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	
 	MatEditorInterface = InMatEditor;
@@ -59,6 +59,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 	SAssignNew(InstanceText,SEditableTextBox);
 	SAssignNew(NodeButtonScrollBox,SScrollBox);
 
+	RefreshMaskPinSelection();
 	
 	this->ChildSlot
 	[
@@ -170,16 +171,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.HAlign(HAlign_Center)
 		.OnClicked_Raw(this,&SMatHelperWidget::SetNodeGroup,true,false)
 	];
-
-	NodeButtonScrollBox->AddSlot()
-	.Padding(3.0f)
-	[
-		SNew(SButton)
-		.Text(FText::FromString("Auto Name"))
-		.VAlign(VAlign_Center)
-		.HAlign(HAlign_Center)
-		.OnClicked_Raw(this,&SMatHelperWidget::RemoveParameterType)
-	];
+	
 
 	NodeButtonScrollBox->AddSlot()
 	.Padding(3.0f)
@@ -191,39 +183,72 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.OnClicked_Raw(this,&SMatHelperWidget::SetNodeGroup,true,true)
 	];
 	
-
-	NodeButtonScrollBox->AddSlot()
-	.Padding(5.0f)
-	[
-		SNew(SComboBox<TSharedPtr<FString>>)
-		.OptionsSource(&MatHelper.MaskPinOptions)
-		.OnGenerateWidget_Lambda([](const TSharedPtr<FString>& InString)
-		{
-			return SNew(STextBlock)
-			.Text(FText::FromString(*InString));
-		})
-		.OnSelectionChanged_Lambda([&](const TSharedPtr<FString>& NewOption,ESelectInfo::Type SelectInfo)
-		{
-			CurrentSelect = MatHelper.MaskPinOptions.Find(NewOption);
-		})
+	if(MaskPinOptions.Num() > 0 )
+	{
+		NodeButtonScrollBox->AddSlot()
+		.Padding(5.0f)
 		[
-			SNew(STextBlock)
-			.Text_Lambda([&]()
+			SNew(SComboBox<TSharedPtr<FString>>)
+			.OptionsSource(&MaskPinOptions)
+			.OnGenerateWidget_Lambda([](const TSharedPtr<FString>& InString)
 			{
-				return FText::FromString(*MatHelper.MaskPinOptions[CurrentSelect]);
+				return SNew(STextBlock)
+				.Text(FText::FromString(*InString));
 			})
-		]
-	];
-
+			.OnSelectionChanged_Lambda([&](const TSharedPtr<FString>& NewOption,ESelectInfo::Type SelectInfo)
+			{
+				CurrentSelect = MaskPinOptions.Find(NewOption);
+			})
+			
+			[
+				SNew(STextBlock)
+				.Text_Lambda([&]()
+				{
+					return FText::FromString(*MaskPinOptions[CurrentSelect]);
+				})
+			]
+		];
+	
+	
+		NodeButtonScrollBox->AddSlot()
+		.Padding(3.0f)
+		[
+			SNew(SButton)
+			.Text(FText::FromString("Add Mask Pin"))
+			.VAlign(VAlign_Center)
+			.HAlign(HAlign_Center)
+			.OnClicked_Raw(this,&SMatHelperWidget::AddNodeMaskPin)
+		];
+	}
 	NodeButtonScrollBox->AddSlot()
 	.Padding(3.0f)
 	[
 		SNew(SButton)
-		.Text(FText::FromString("Add Mask Pin"))
+		.Text(FText::FromString("Show Pin Name"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked_Raw(this,&SMatHelperWidget::AddNodeMaskPin)
+		.OnClicked_Lambda([&]()
+		{
+			MatEditorInterface->FocusWindow();
+			TArray<UObject*> SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
+			if(SelectedNodes.Num() == 0)
+			{
+				return FReply::Handled();
+			}
+			
+			if(CheckNode(SelectedNodes[0]) == false)
+			{
+				return FReply::Handled();
+			}
+
+			UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(SelectedNodes[0]);
+			MatNode->MaterialExpression->bShowOutputNameOnPin = !MatNode->MaterialExpression->bShowOutputNameOnPin;
+			MatNode->RecreateAndLinkNode();
+			MatEditorInterface->UpdateMaterialAfterGraphChange();
+			return FReply::Handled();
+		})
 	];
+
 
 	
 	NodeButtonScrollBox->AddSlot()
@@ -266,13 +291,11 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 	.Padding(3.0f)
 	[
 		SNew(SButton)
-		.Text(FText::FromString("-Refresh Button-"))
+		.Text(FText::FromString("Auto Name"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked_Raw(this,&SMatHelperWidget::RefreshButton)
+		.OnClicked_Raw(this,&SMatHelperWidget::RemoveParameterType)
 	];
-
-
 	
 	InitialButton();
 }
@@ -368,92 +391,17 @@ FReply SMatHelperWidget::AddNodeMaskPin()
 
 	UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(SelectedNodes[0]);
 	
-	bool IsAddSuccess = false;
-	switch (CurrentSelect)
-	{
-	case 0 :
-		{
-			AddMaskPin(MatNode,"R",FIntVector4(1,0,0,0),IsAddSuccess);
-			break;
-		}
-	case 1 :
-		{
-			AddMaskPin(MatNode,"G",FIntVector4(0,1,0,0),IsAddSuccess);
-			break;
-		}
-	case 2:
-		{
-			AddMaskPin(MatNode,"B",FIntVector4(0,0,1,0),IsAddSuccess);
-			break;
-		}
-	case 3:
-		{
-			AddMaskPin(MatNode,"A",FIntVector4(0,0,0,1),IsAddSuccess);
-			break;
-		}
-	case 4:
-		{
-			AddMaskPin(MatNode,"RGB",FIntVector4(1,1,1,0),IsAddSuccess);
-			break;
-		}
-	case 5:
-		{
-			AddMaskPin(MatNode,"RGBA",FIntVector4(1,1,1,1),IsAddSuccess);
-			break;
-		}
-	case 6:
-		{
-			AddMaskPin(MatNode,"RG",FIntVector4(1,1,0,0),IsAddSuccess);
-			break;
-		}
-	case 7:
-		{
-			AddMaskPin(MatNode,"BA",FIntVector4(0,0,1,1),IsAddSuccess);
-			break;
-		}
-	case 8:
-		{
-			AddMaskPin(MatNode,"RG",FIntVector4(1,1,0,0),IsAddSuccess);
-			AddMaskPin(MatNode,"BA",FIntVector4(0,0,1,1),IsAddSuccess);
-			break;
-		}
-	case 9:
-		{
-			MatNode->MaterialExpression->bShowOutputNameOnPin = !MatNode->MaterialExpression->bShowOutputNameOnPin;
-			IsAddSuccess = true;
-			break;
-		}
-	case 10:
-		{
-			TArray<FExpressionOutput>& Outputs = MatNode->MaterialExpression->Outputs;
-			Outputs.Empty();
-			IsAddSuccess = true;
-			break;
-		}
-	case 11:
-		{
-			TArray<FExpressionOutput>& Outputs = MatNode->MaterialExpression->Outputs;
-			Outputs.Empty();
-			AddMaskPin(MatNode,"RG",FIntVector4(1,1,0,0),IsAddSuccess);
-			AddMaskPin(MatNode,"BA",FIntVector4(0,0,1,1),IsAddSuccess);
-			MatNode->MaterialExpression->bShowOutputNameOnPin = !MatNode->MaterialExpression->bShowOutputNameOnPin;
-			IsAddSuccess = true;
-			break;
-		}
-	default: break;
-	}
+	AddMaskPin(MatNode,*MaskPinOptions[CurrentSelect].Get(),MaskPinInfo[CurrentSelect]);
 	
-	if(IsAddSuccess)
-	{
-		MatEditorInterface->FocusWindow();
-		MatNode->RecreateAndLinkNode();
-		MatEditorInterface->UpdateMaterialAfterGraphChange();
-	}
+	MatEditorInterface->FocusWindow();
+	MatNode->RecreateAndLinkNode();
+	MatEditorInterface->UpdateMaterialAfterGraphChange();
+	
 	return FReply::Handled();
 }
 
 
-void SMatHelperWidget::AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask,bool& Out_IsAddSuccess)
+void SMatHelperWidget::AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask)
 {
 	const TObjectPtr<UMaterialExpression> Expression = MatNode->MaterialExpression;
 	TArray<FExpressionOutput>& Outputs = Expression->Outputs;
@@ -479,7 +427,6 @@ void SMatHelperWidget::AddMaskPin(const UMaterialGraphNode* MatNode, const FStri
 	{
 		Outputs.RemoveAt(Index);
 	}
-	Out_IsAddSuccess = true;
 }
 
 FReply SMatHelperWidget::CreateInstance()
@@ -610,6 +557,9 @@ FReply SMatHelperWidget::InitialButton()
 		
 		NodeButtons.Add(Button);
 	}
+
+	// MaskPin Selection
+	
 	return FReply::Handled();
 }
 
@@ -770,6 +720,17 @@ FReply SMatHelperWidget::RemoveParameterType()
 	return FReply::Handled();
 }
 
+
+void SMatHelperWidget::RefreshMaskPinSelection()
+{
+	FMatHelperModule& MatHelper = FMatHelperModule::Get();
+	TArray<FNodeMaskPin> Array = MatHelper.MatHelperMgn->MaskPinInfo;
+	for(auto& Info : Array)
+	{
+		MaskPinOptions.Add(MakeShareable(new FString(Info.ButtonName)));
+		MaskPinInfo.Add(Info.MaskValue);
+	}
+}
 
 inline bool SMatHelperWidget::CheckNode(UObject* Node)
 {

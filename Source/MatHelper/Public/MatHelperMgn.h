@@ -7,6 +7,19 @@
 
 
 USTRUCT()
+struct FNodeMaskPin
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere,Category = "Material")
+	FString ButtonName = "";
+
+	// X:R , Y:G , Z:B , W:A
+	UPROPERTY(EditAnywhere,Category = "Material")
+	FIntVector4 MaskValue ;
+};
+
+USTRUCT()
 struct FNodeButton
 {
 	GENERATED_BODY()
@@ -58,10 +71,16 @@ public:
 	// 应用ICON
 	UFUNCTION(CallInEditor,Category = "Material")
 	void ModifyICON();
+
+public:
 	
 	//材质资产的显示颜色，引擎默认是绿色(64,192,64)
 	UPROPERTY(EditAnywhere,Category = "Material")
 	FColor MaterialAssetColor = FColor(255,25,25);
+
+	//材质实例资产的显示颜色，引擎默认是绿色(0,128,0)
+	UPROPERTY(EditAnywhere,Category = "Material")
+	FColor MaterialInstanceAssetColor = FColor(0,128,0);
 
 	// 决定了插件助手面板的占比，1是占一半，2是全占. 0.5是一半的一半
 	// 更改后需要重新启动 材质编辑器 才会生效
@@ -76,8 +95,10 @@ public:
 	// 节点按钮创建节点的位置---相对于普通节点的位置偏移
 	UPROPERTY(EditAnywhere,Category = "Material")
 	FVector2D BaseOffset = FVector2D(50,50);
-	
 
+	UPROPERTY(EditAnywhere,Category = "Material")
+	TArray<FNodeMaskPin> MaskPinInfo;
+	
 	// 自动分组关键词
 	UPROPERTY(EditAnywhere,Category = "Material")
 	TArray<FString> AutoGroupKeys;
@@ -85,6 +106,8 @@ public:
 	// 节点按钮信息
 	UPROPERTY(EditAnywhere,Category = "Material")
 	TArray<FNodeButton> NodeButtonInfo;
+
+public:
 	
 	// 将Niagara拖入定序器时，自动打开轨道并设置为 DesiredAge 模式.
 	// 设置更改后需要重启引擎.

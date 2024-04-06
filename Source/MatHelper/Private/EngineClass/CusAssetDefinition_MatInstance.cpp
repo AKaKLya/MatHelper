@@ -36,14 +36,8 @@ EAssetCommandResult UCusAssetDefinition_MatInstance::OpenAssets(const FAssetOpen
 	{
 		IMaterialEditorModule* MaterialEditorModule = &FModuleManager::LoadModuleChecked<IMaterialEditorModule>( "MaterialEditor" );
 		TSharedRef<IMaterialEditor> EditorRef = MaterialEditorModule->CreateMaterialInstanceEditor(OpenArgs.GetToolkitMode(), OpenArgs.ToolkitHost, MIC);
-		
-		/*IMaterialEditor* EditorPtr = EditorRef.ToSharedPtr().Get();
-		FMaterialInstanceEditor* MatInstanceEditor = static_cast<FMaterialInstanceEditor*>(EditorPtr);
-		SimpleRunnable* Simple = new SimpleRunnable(MatInstanceEditor);
-		FRunnableThread* RunnableThread = FRunnableThread::Create(Simple,TEXT("MatCusThread"));*/
 	}
 
-//DetailLayouts
 	return EAssetCommandResult::Handled;
 }
 #undef LOCTEXT_NAMESPACE

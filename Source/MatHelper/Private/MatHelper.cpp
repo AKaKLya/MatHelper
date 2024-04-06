@@ -25,6 +25,7 @@
 #include "SMaterialPalette.h"
 #include "ButtonClass/SimpleButtonCommands.h"
 #include "Editor/Sequencer/Public/ISequencer.h"
+#include "EngineClass/CusAssetDefinition_MatInstance.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Interfaces/IPluginManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -99,7 +100,7 @@ void FMatHelperModule::StartupModule()
 		FCanExecuteAction());
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FMatHelperModule::RegisterButton));
 	
-	AddStringToTArray(MaskPinOptions, "R","G","B","A","RGB","RGBA","RG","BA","RG - BA","ShowName","ClearAllPin","Only RG - BA");
+	//AddStringToTArray(MaskPinOptions, "R","G","B","A","RGB","RGBA","RG","BA","RG - BA","ShowName","ClearAllPin","Only RG - BA");
 	
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ButtonInfoEditorTabName, FOnSpawnTab::CreateRaw(this, &FMatHelperModule::OnSpawnButtonInfoEditor))
 		.SetDisplayName(FText::FromString("ButtonInfoEditor"))
@@ -108,6 +109,10 @@ void FMatHelperModule::StartupModule()
 	const UCusAssetDefinition_Material* MaterialDefinition = Cast<UCusAssetDefinition_Material>(UAssetDefinitionRegistry::Get()->GetAssetDefinitionForClass(UMaterial::StaticClass()));
 	UCusAssetDefinition_Material* NonConstMaterialDefinition = const_cast<UCusAssetDefinition_Material*>(MaterialDefinition);
 	NonConstMaterialDefinition->Color = MatHelperMgn->MaterialAssetColor;
+
+	const UCusAssetDefinition_MatInstance* MaterialInstanceDefinition = Cast<UCusAssetDefinition_MatInstance>(UAssetDefinitionRegistry::Get()->GetAssetDefinitionForClass(UMaterialInstanceConstant::StaticClass()));
+	UCusAssetDefinition_MatInstance* NonConstMaterialInstanceDefinition = const_cast<UCusAssetDefinition_MatInstance*>(MaterialInstanceDefinition);
+	NonConstMaterialInstanceDefinition->Color = MatHelperMgn->MaterialInstanceAssetColor;
 	
 	IMaterialEditorModule& MatInterface = IMaterialEditorModule::Get();
 	MatInterface.OnMaterialEditorOpened().AddLambda([&](const TWeakPtr<IMaterialEditor>& InMatEditor)
