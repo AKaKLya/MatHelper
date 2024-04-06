@@ -162,7 +162,9 @@ void FMatHelperModule::PlayNiagaraOnEditorWorld()
 		auto Niagara = Cast<ANiagaraActor>(NiagaraActor);
 		if(Niagara->Tags.Contains("NiagaraAutoPlay"))
 		{
-			Niagara->GetNiagaraComponent()->ResetSystem();
+			UNiagaraComponent* NiagaraComponent = Niagara->GetNiagaraComponent();
+			NiagaraComponent->Activate(true);
+			NiagaraComponent->ReregisterComponent();
 		}
 	}
 }
