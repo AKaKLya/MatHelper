@@ -81,23 +81,12 @@ Tool 工具栏:
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/f602eb33-7b6b-4634-be03-de1baed0d14b)
 
 ## V6.1 插件完结.
-### [虚幻商城:等待更新]
-
+### [虚幻商城:5.3/5.4等待更新]
 
 增加 [材质实例编辑器] 开启/关闭所有参数 按钮,
 
 点击 开启所有参数，再点 关闭所有参数. 有时会卡住 多点两下就行.
 
-5.3版本没有编译，但是稍后会上传到虚幻商城，
-(新版本审核通过后，这里会修改 [虚幻商城:等待更新] 为 虚幻商城:已更新)
-
-可以从虚幻商城下载安装， 也可以下载插件 重新编译出5.3版本的.
-
-1.下载 V6.0-UE5.3 版本 和 V6.1-UE5.4 版本的插件
-
-2. 用 6.1 的 Source 文件夹，替换 6.0 的 Source 文件夹
-
-3.编译时 要把MatHelper.uplugin 的 "EngineVersion": "5.4.0", 修改为 "EngineVersion": "5.3.0".
 
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/5057d5ad-8d1e-4525-8788-c881fb9d4119)
 
