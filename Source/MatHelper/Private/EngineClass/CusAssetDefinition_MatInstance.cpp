@@ -5,10 +5,9 @@
 #include "TAccessPrivate.inl"
 #include "IMaterialEditor.h"
 #include "IPropertyRowGenerator.h"
-#include "MaterialEditorModule.h"
 #include "MaterialInstanceEditor.h"
+#include "MaterialEditorModule.h"
 #include "SMaterialLayersFunctionsTree.h"
-#include "MaterialPropertyHelpers.h"
 #include "EngineClass/CusMaterialEditorInstanceDetailCustomization.h"
 #include "MaterialEditor/DEditorMaterialLayersParameterValue.h"
 #include "MaterialEditor/DEditorParameterValue.h"
@@ -19,11 +18,12 @@
 
 #define LOCTEXT_NAMESPACE "MaterialInstanceEditor"
 
-struct AccessPalette
+
+struct AccessDetails
 {
 	typedef TSharedPtr<class IDetailsView> (FMaterialInstanceEditor::*Type);
 };
-template struct TAccessPrivateStub<AccessPalette,&FMaterialInstanceEditor::MaterialInstanceDetails>;
+template struct TAccessPrivateStub<AccessDetails,&FMaterialInstanceEditor::MaterialInstanceDetails>;
 
 struct AccessInstance
 {
@@ -63,9 +63,9 @@ EAssetCommandResult UCusAssetDefinition_MatInstance::OpenAssets(const FAssetOpen
 		IMaterialEditorModule* MaterialEditorModule = &FModuleManager::LoadModuleChecked<IMaterialEditorModule>( "MaterialEditor" );
 		TSharedRef<IMaterialEditor> EditorRef = MaterialEditorModule->CreateMaterialInstanceEditor(OpenArgs.GetToolkitMode(), OpenArgs.ToolkitHost, MIC);
 		
-		auto Editor = EditorRef.ToSharedPtr().Get();
+		IMaterialEditor* Editor = &EditorRef.Get();
 		auto MatInstanceEditor = static_cast<FMaterialInstanceEditor*>(Editor);
-		auto Detail = MatInstanceEditor->*TAccessPrivate<AccessPalette>::Value;
+		auto Detail = MatInstanceEditor->*TAccessPrivate<AccessDetails>::Value;
 		auto Instance = MatInstanceEditor->*TAccessPrivate<AccessInstance>::Value;
 		auto Layer = MatInstanceEditor->*TAccessPrivate<AccessLayer>::Value;
 		
@@ -82,11 +82,9 @@ EAssetCommandResult UCusAssetDefinition_MatInstance::OpenAssets(const FAssetOpen
 			Layer->Refresh();
 		}
 	}
-
 	return EAssetCommandResult::Handled;
 }
 
-#pragma region EngineClassCpp
 
 void SMaterialLayersFunctionsInstanceTree::AddLayer()
 {
@@ -138,93 +136,6 @@ TSharedPtr<IDetailTreeNode> FindParameterGroupsNode(TSharedPtr<IPropertyRowGener
 		}
 	}
 	return nullptr;
-}
-
-
-
-void SMaterialLayersFunctionsInstanceTree::SetParentsExpansionState()
-{
-	for (const auto& Pair : LayerProperties)
-	{
-		if (Pair->Children.Num())
-		{
-			bool* bIsExpanded = MaterialEditorInstance->SourceInstance->LayerParameterExpansion.Find(Pair->NodeKey);
-			if (bIsExpanded)
-			{
-				SetItemExpansion(Pair, *bIsExpanded);
-			}
-		}
-	}
-}
-
-
-void SMaterialLayersFunctionsInstanceTree::ShowSubParameters(TSharedPtr<FSortedParamData> ParentParameter)
-{
-	for (FUnsortedParamData Property : NonLayerProperties)
-	{
-		UDEditorParameterValue* Parameter = Property.Parameter;
-		if (Parameter->ParameterInfo.Index == ParentParameter->ParameterInfo.Index
-			&& Parameter->ParameterInfo.Association == ParentParameter->ParameterInfo.Association)
-		{
-			TSharedPtr<FSortedParamData> GroupProperty(new FSortedParamData());
-			GroupProperty->StackDataType = EStackDataType::Group;
-			GroupProperty->ParameterInfo.Index = Parameter->ParameterInfo.Index;
-			GroupProperty->ParameterInfo.Association = Parameter->ParameterInfo.Association;
-			GroupProperty->Group = Property.ParameterGroup;
-			GroupProperty->NodeKey = FString::FromInt(GroupProperty->ParameterInfo.Index) + FString::FromInt(GroupProperty->ParameterInfo.Association) + Property.ParameterGroup.GroupName.ToString();
-
-			bool bAddNewGroup = true;
-			for (TSharedPtr<struct FSortedParamData> GroupChild : ParentParameter->Children)
-			{
-				if (GroupChild->NodeKey == GroupProperty->NodeKey)
-				{
-					bAddNewGroup = false;
-				}
-			}
-			if (bAddNewGroup)
-			{
-				ParentParameter->Children.Add(GroupProperty);
-			}
-
-			TSharedPtr<FSortedParamData> ChildProperty(new FSortedParamData());
-			ChildProperty->StackDataType = EStackDataType::Property;
-			ChildProperty->Parameter = Parameter;
-			ChildProperty->ParameterInfo.Index = Parameter->ParameterInfo.Index;
-			ChildProperty->ParameterInfo.Association = Parameter->ParameterInfo.Association;
-			ChildProperty->ParameterNode = Property.ParameterNode;
-			ChildProperty->PropertyName = Property.UnsortedName;
-			ChildProperty->NodeKey = FString::FromInt(ChildProperty->ParameterInfo.Index) + FString::FromInt(ChildProperty->ParameterInfo.Association) +  Property.ParameterGroup.GroupName.ToString() + Property.UnsortedName.ToString();
-
-
-			UDEditorStaticComponentMaskParameterValue* CompMaskParam = Cast<UDEditorStaticComponentMaskParameterValue>(Parameter);
-			if (!CompMaskParam)
-			{
-				TArray<TSharedRef<IDetailTreeNode>> ParamChildren;
-				Property.ParameterNode->GetChildren(ParamChildren);
-				for (int32 ParamChildIdx = 0; ParamChildIdx < ParamChildren.Num(); ParamChildIdx++)
-				{
-					TSharedPtr<FSortedParamData> ParamChildProperty(new FSortedParamData());
-					ParamChildProperty->StackDataType = EStackDataType::PropertyChild;
-					ParamChildProperty->ParameterNode = ParamChildren[ParamChildIdx];
-					ParamChildProperty->ParameterHandle = ParamChildProperty->ParameterNode->CreatePropertyHandle();
-					ParamChildProperty->ParameterInfo.Index = Parameter->ParameterInfo.Index;
-					ParamChildProperty->ParameterInfo.Association = Parameter->ParameterInfo.Association;
-					ParamChildProperty->Parameter = ChildProperty->Parameter;
-					ChildProperty->Children.Add(ParamChildProperty);
-				}
-			}
-			for (TSharedPtr<struct FSortedParamData> GroupChild : ParentParameter->Children)
-			{
-				if (GroupChild->Group.GroupName == Property.ParameterGroup.GroupName
-					&& GroupChild->ParameterInfo.Association == ChildProperty->ParameterInfo.Association
-					&&  GroupChild->ParameterInfo.Index == ChildProperty->ParameterInfo.Index)
-				{
-					GroupChild->Children.Add(ChildProperty);
-				}
-			}
-
-		}
-	}
 }
 
 
@@ -461,6 +372,92 @@ void SMaterialLayersFunctionsInstanceTree::CreateGroupsWidget()
 }
 
 
+void SMaterialLayersFunctionsInstanceTree::ShowSubParameters(TSharedPtr<FSortedParamData> ParentParameter)
+{
+	for (FUnsortedParamData Property : NonLayerProperties)
+	{
+		UDEditorParameterValue* Parameter = Property.Parameter;
+		if (Parameter->ParameterInfo.Index == ParentParameter->ParameterInfo.Index
+			&& Parameter->ParameterInfo.Association == ParentParameter->ParameterInfo.Association)
+		{
+			TSharedPtr<FSortedParamData> GroupProperty(new FSortedParamData());
+			GroupProperty->StackDataType = EStackDataType::Group;
+			GroupProperty->ParameterInfo.Index = Parameter->ParameterInfo.Index;
+			GroupProperty->ParameterInfo.Association = Parameter->ParameterInfo.Association;
+			GroupProperty->Group = Property.ParameterGroup;
+			GroupProperty->NodeKey = FString::FromInt(GroupProperty->ParameterInfo.Index) + FString::FromInt(GroupProperty->ParameterInfo.Association) + Property.ParameterGroup.GroupName.ToString();
+
+			bool bAddNewGroup = true;
+			for (TSharedPtr<struct FSortedParamData> GroupChild : ParentParameter->Children)
+			{
+				if (GroupChild->NodeKey == GroupProperty->NodeKey)
+				{
+					bAddNewGroup = false;
+				}
+			}
+			if (bAddNewGroup)
+			{
+				ParentParameter->Children.Add(GroupProperty);
+			}
+
+			TSharedPtr<FSortedParamData> ChildProperty(new FSortedParamData());
+			ChildProperty->StackDataType = EStackDataType::Property;
+			ChildProperty->Parameter = Parameter;
+			ChildProperty->ParameterInfo.Index = Parameter->ParameterInfo.Index;
+			ChildProperty->ParameterInfo.Association = Parameter->ParameterInfo.Association;
+			ChildProperty->ParameterNode = Property.ParameterNode;
+			ChildProperty->PropertyName = Property.UnsortedName;
+			ChildProperty->NodeKey = FString::FromInt(ChildProperty->ParameterInfo.Index) + FString::FromInt(ChildProperty->ParameterInfo.Association) +  Property.ParameterGroup.GroupName.ToString() + Property.UnsortedName.ToString();
+
+
+			UDEditorStaticComponentMaskParameterValue* CompMaskParam = Cast<UDEditorStaticComponentMaskParameterValue>(Parameter);
+			if (!CompMaskParam)
+			{
+				TArray<TSharedRef<IDetailTreeNode>> ParamChildren;
+				Property.ParameterNode->GetChildren(ParamChildren);
+				for (int32 ParamChildIdx = 0; ParamChildIdx < ParamChildren.Num(); ParamChildIdx++)
+				{
+					TSharedPtr<FSortedParamData> ParamChildProperty(new FSortedParamData());
+					ParamChildProperty->StackDataType = EStackDataType::PropertyChild;
+					ParamChildProperty->ParameterNode = ParamChildren[ParamChildIdx];
+					ParamChildProperty->ParameterHandle = ParamChildProperty->ParameterNode->CreatePropertyHandle();
+					ParamChildProperty->ParameterInfo.Index = Parameter->ParameterInfo.Index;
+					ParamChildProperty->ParameterInfo.Association = Parameter->ParameterInfo.Association;
+					ParamChildProperty->Parameter = ChildProperty->Parameter;
+					ChildProperty->Children.Add(ParamChildProperty);
+				}
+			}
+			for (TSharedPtr<struct FSortedParamData> GroupChild : ParentParameter->Children)
+			{
+				if (GroupChild->Group.GroupName == Property.ParameterGroup.GroupName
+					&& GroupChild->ParameterInfo.Association == ChildProperty->ParameterInfo.Association
+					&&  GroupChild->ParameterInfo.Index == ChildProperty->ParameterInfo.Index)
+				{
+					GroupChild->Children.Add(ChildProperty);
+				}
+			}
+
+		}
+	}
+}
+
+
+void SMaterialLayersFunctionsInstanceTree::SetParentsExpansionState()
+{
+	for (const auto& Pair : LayerProperties)
+	{
+		if (Pair->Children.Num())
+		{
+			bool* bIsExpanded = MaterialEditorInstance->SourceInstance->LayerParameterExpansion.Find(Pair->NodeKey);
+			if (bIsExpanded)
+			{
+				SetItemExpansion(Pair, *bIsExpanded);
+			}
+		}
+	}
+}
+
+
 void SMaterialLayersFunctionsInstanceWrapper::Refresh()
 {
 	LayerParameter.Reset();
@@ -559,8 +556,5 @@ void SMaterialLayersFunctionsInstanceWrapper::Refresh()
 			];
 	}
 }
-#pragma endregion
-
-
 
 #undef LOCTEXT_NAMESPACE
