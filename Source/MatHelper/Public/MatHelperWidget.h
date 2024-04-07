@@ -30,7 +30,6 @@ private:
 	
 	TSharedPtr<SScrollBox> NodeButtonScrollBox;
 	
-	void RefreshMaskPinSelection();
 	
 	FString PluginConfigPath;
 	inline bool CheckNode(UObject* Node);
@@ -39,10 +38,8 @@ private:
 	FReply SetNodeGroup(bool AutoGroup,bool AllGroup);
 	
 	//TSharedPtr<SEditableTextBox> MaskPinText;
-	TArray<TSharedPtr<FString>> MaskPinOptions;
-	TArray<FIntVector4> MaskPinInfo;
 	FReply AddNodeMaskPin();
-	void AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask);
+	void AddMaskPin(const UMaterialGraphNode* MatNode, const FString& Name, const FIntVector4& Mask, bool& Out_IsAddSuccess);
 	int CurrentSelect = 0;
 
 	TSharedPtr<SEditableTextBox> InstanceText;
