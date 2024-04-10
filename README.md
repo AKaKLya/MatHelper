@@ -89,7 +89,7 @@ Tool 工具栏:
 
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/f602eb33-7b6b-4634-be03-de1baed0d14b)
 
-## V6.1 插件完结.
+## V6.1 
 
 增加 [材质实例编辑器] 开启/关闭所有参数 按钮,
 
@@ -97,4 +97,20 @@ Tool 工具栏:
 
 
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/5057d5ad-8d1e-4525-8788-c881fb9d4119)
+
+
+## V6.2 场景预览窗口
+
+可以在 材质插件窗口里打开，也可以在菜单栏里打开.
+
+
+![image](https://github.com/AKaKLya/MatHelper/assets/67385510/0ed47448-e31e-4382-bc3a-ffcbee9cfadc)
+
+![image](https://github.com/AKaKLya/MatHelper/assets/67385510/350fedc3-ddb6-421a-ad40-39cf31cb8a1d)
+
+
+
+![image](https://github.com/AKaKLya/MatHelper/assets/67385510/273de50a-e298-44a8-8d92-228085c4cfe6)
+
+![image](https://github.com/AKaKLya/MatHelper/assets/67385510/10bea428-96f8-4b54-a8fa-57d27c96def7)
 
