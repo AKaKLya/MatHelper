@@ -103,7 +103,7 @@ Tool 工具栏:
 
 可以在 材质插件窗口里打开，也可以在菜单栏里打开.
 
-菜单栏的启动方法可以在任何一个编辑器中 创建预览窗口，例如:Niagara编辑器,蓝图编辑器...
+Tool菜单栏的启动方法可以在任何一个编辑器中 创建预览窗口，例如:Niagara编辑器,蓝图编辑器...
 
 
 ![image](https://github.com/AKaKLya/MatHelper/assets/67385510/0ed47448-e31e-4382-bc3a-ffcbee9cfadc)
