@@ -144,7 +144,21 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 			return FReply::Handled();
 		})
 	];
+
 	
+	NodeButtonScrollBox->AddSlot()
+	.Padding(5.0f)
+	[
+		SNew(SButton)
+		.Text(FText::FromString("Scene View"))
+		.VAlign(VAlign_Center)
+		.HAlign(HAlign_Center)
+		.OnClicked_Lambda([]()
+		{
+			FGlobalTabmanager::Get()->TryInvokeTab(FMatHelperModule::MaterialSceneViewEditorTabName);
+			return FReply::Handled();
+		})
+	];
 	
 	NodeButtonScrollBox->AddSlot()
 	.Padding(5.0f)
@@ -306,13 +320,13 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup,bool AllGroup)
 
 	if(AllGroup == true)
 	{
-		auto GraphEdPtr =  MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
-		if(auto GraphEd = GraphEdPtr.Pin().Get())
+		const auto GraphEdPtr =  MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
+		if(const auto GraphEd = GraphEdPtr.Pin().Get())
 		{
 			GraphEd->SelectAllNodes();
 		}
 	}
-	FMatHelperModule& MatHelper = FMatHelperModule::Get();
+	const FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	TArray<FString> Names = MatHelper.MatHelperMgn->AutoGroupKeys;
 	
 	TArray<UObject*> SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
@@ -322,7 +336,6 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup,bool AllGroup)
 	{
 		if(UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(Node))
 		{
-
 			if(CheckNode(MatNode) == false)
 			{
 				continue;
@@ -344,7 +357,6 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup,bool AllGroup)
 					Parameter->Group = *GroupText->GetText().ToString();
 				}
 				ShouldRefresh=true;
-				
 			}
 			else if(UMaterialExpressionTextureSampleParameter* TexParameter = Cast<UMaterialExpressionTextureSampleParameter>(MatNode->MaterialExpression))
 			{
@@ -409,7 +421,7 @@ FReply SMatHelperWidget::AddNodeMaskPin()
 	
 	if(!Found)
 	{
-		Outputs.Add(FExpressionOutput(FName(*MaskPinOptions[CurrentSelect].Get()), 1,
+		Outputs.Add(FExpressionOutput(FName(**MaskPinOptions[CurrentSelect].Get()), 1,
 			MaskPinInfo[CurrentSelect].X, MaskPinInfo[CurrentSelect].Y,
 			MaskPinInfo[CurrentSelect].Z, MaskPinInfo[CurrentSelect].W));
 	}
@@ -529,7 +541,7 @@ FReply SMatHelperWidget::FixFunctionNode()
 
 FReply SMatHelperWidget::InitialButton()
 {
-	FMatHelperModule& MatHelper = FMatHelperModule::Get();
+	const FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	for(auto Button : NodeButtons)
 	{
 		NodeButtonScrollBox->RemoveSlot(Button.ToSharedRef());
@@ -555,8 +567,7 @@ FReply SMatHelperWidget::InitialButton()
 		
 		NodeButtons.Add(Button);
 	}
-
-	// MaskPin Selection
+	
 	
 	return FReply::Handled();
 }
@@ -580,6 +591,7 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 		MatHelper.EditorNotify("This Text Maybe Empty.",SNotificationItem::CS_Fail);
 		return FReply::Handled();
 	}
+	
 	FString ClipboardContent;
 	FPlatformApplicationMisc::ClipboardPaste(ClipboardContent);
 	FPlatformApplicationMisc::ClipboardCopy(*NodeText);
@@ -616,14 +628,12 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 	}
 	else
 	{
-		const auto BaseRootNode =  MatEditorInterface->GetMaterialInterface()->GetMaterial()->MaterialGraph->RootNode;
+		const auto BaseRootNode =  Graph->RootNode;
 		const FVector2D Location = FVector2D(BaseRootNode->NodePosX + RootOffset.X,BaseRootNode->NodePosY + RootOffset.Y);
 		MatEditorInterface->PasteNodesHere(Location);
 	}
 	
 	auto NewNodes = MatEditorInterface->GetSelectedNodes().Array();
-	
-//	MatEditorInterface->JumpToExpression(Cast<UMaterialGraphNode>(NewNodes[0])->MaterialExpression);
 	
 	for(const auto Node : NewNodes)
 	{
@@ -635,7 +645,7 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 		MatEditorInterface->AddToSelection(MatNode->MaterialExpression);
 	}
 
-	TWeakPtr<SGraphEditor> GraphEdPtr = MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
+	const TWeakPtr<SGraphEditor> GraphEdPtr = MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
 	GraphEdPtr.Pin().Get()->JumpToNode(Cast<UMaterialGraphNode>(NewNodes[0]),false,false);
 	
 	
@@ -650,78 +660,67 @@ FReply SMatHelperWidget::RefreshButton()
 	return FReply::Handled();
 }
 
+bool ModifyName(FString& Name)
+{
+	const FString VersionsToReplace[] ={ TEXT(" (V2)"), TEXT(" (V3)"), TEXT(" (V4)"), TEXT(" (S)"), TEXT(" (T2d)"), TEXT(" (SB)")};
+
+	for (auto& Version : VersionsToReplace)
+	{
+		if (Name.Contains(Version))
+		{
+			Name.ReplaceInline(*Version, TEXT(""));
+			return true;
+		}
+	}
+	return false; 
+}
+
 FReply SMatHelperWidget::RemoveParameterType()
 {
 	bool ShouldRefresh = false;
-	auto GraphEdPtr =  MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
-	if(auto GraphEd = GraphEdPtr.Pin().Get())
-	{
-		GraphEd->SelectAllNodes();
-	}
 
-	auto SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
-
-	for(auto Node : SelectedNodes)
-	{
-		if(auto MatNode = Cast<UMaterialGraphNode>(Node))
-		{
-			if(CheckNode(MatNode) == false)
-			{
-				continue;
-			}
-			if(UMaterialExpressionParameter* Parameter = Cast<UMaterialExpressionParameter>(MatNode->MaterialExpression))
-			{
-				FString Name = Parameter->ParameterName.ToString();
-				if(Name.Contains(" (V2)"))
-				{
-					Name.ReplaceInline(TEXT(" (V2)"),TEXT(""));
-					goto End;
-				}
-				if(Name.Contains((" (V3)")))
-				{
-					Name.ReplaceInline(TEXT(" (V3)"),TEXT(""));
-					goto End;
-				}
-				if(Name.Contains((" (V4)")))
-				{
-					Name.ReplaceInline(TEXT(" (V4)"),TEXT(""));
-					goto End;
-				}
-				if(Name.Contains((" (S)")))
-				{
-					Name.ReplaceInline(TEXT(" (S)"),TEXT(""));
-					goto End;
-				}
-				if(Name.Contains((" (T2d)")))
-				{
-					Name.ReplaceInline(TEXT(" (T2d)"),TEXT(""));
-					goto End;
-				}
-				if(Name.Contains((" (SB)")))
-				{
-					Name.ReplaceInline(TEXT(" (SB)"),TEXT(""));
-					goto End;
-				}
-				
-				End:
-				ShouldRefresh = true;
-				Parameter->ParameterName = *Name;
-			}
-			
-		}
+	const auto GraphEdPtr = MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
+	if (const auto GraphEd = GraphEdPtr.Pin().Get()) {
+	    GraphEd->SelectAllNodes();
 	}
 	
-	if(ShouldRefresh)
+	auto SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
+	if (SelectedNodes.Num() == 0) {
+	    return FReply::Handled();
+	}
+	
+	for (const auto Node : SelectedNodes)
 	{
-		MatEditorInterface->UpdateMaterialAfterGraphChange();
+		if (const auto MatNode = Cast<UMaterialGraphNode>(Node))
+	    {
+	       	if (CheckNode(MatNode) == false)
+	       	{
+	       	    continue;
+	       	}
+			
+	       	if (const auto Parameter = Cast<UMaterialExpressionParameter>(MatNode->MaterialExpression); Parameter != nullptr)
+	       	{
+	       	    FString Name = Parameter->ParameterName.ToString();
+	       	    if (ModifyName(Name))
+	       	    {
+	       	        ShouldRefresh = true;
+	       	        Parameter->ParameterName = *Name;
+	       	    }
+	       	}
+	    }
+	}
+
+	if (ShouldRefresh) {
+	    MatEditorInterface->UpdateMaterialAfterGraphChange();
 	}
 	return FReply::Handled();
+	
 }
 
 
 void SMatHelperWidget::RefreshMaskPinSelection()
 {
-	FMatHelperModule& MatHelper = FMatHelperModule::Get();
+	const FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	TArray<FNodeMaskPin> Array = MatHelper.MatHelperMgn->MaskPinInfo;
 	for(auto& Info : Array)
 	{

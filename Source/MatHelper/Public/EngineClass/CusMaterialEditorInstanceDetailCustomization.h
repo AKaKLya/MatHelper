@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright AKaKLya 2024
 
 #pragma once
 
@@ -15,6 +15,7 @@ class IDetailGroup;
 class IDetailLayoutBuilder;
 class IPropertyHandle;
 class UMaterialEditorInstanceConstant;
+class FMaterialInstanceEditor;
 
 DECLARE_DELEGATE_OneParam(FCusGetShowHiddenParameters, bool&);
 
@@ -26,10 +27,9 @@ class FCusMaterialInstanceParameterDetails : public IDetailCustomization
 {
 public:
 	/** Makes a new instance of this detail layout class for a specific detail view requesting it */
-	static TSharedRef<class IDetailCustomization> MakeInstance(UMaterialEditorInstanceConstant* MaterialInstance, FCusGetShowHiddenParameters InShowHiddenDelegate);
-	
+	static TSharedRef<class IDetailCustomization> MakeInstance(UMaterialEditorInstanceConstant* MaterialInstance);
 	/** Constructor */
-	FCusMaterialInstanceParameterDetails(UMaterialEditorInstanceConstant* MaterialInstance, FCusGetShowHiddenParameters InShowHiddenDelegate);
+	FCusMaterialInstanceParameterDetails(UMaterialEditorInstanceConstant* MaterialInstance);
 
 	/** IDetailCustomization interface */
 	virtual void CustomizeDetails(IDetailLayoutBuilder& DetailLayout) override;
@@ -46,6 +46,9 @@ private:
 
 	/** Builds the widget for an individual parameter group */
 	void CreateSingleGroupWidget(struct FEditorParameterGroup& ParameterGroup, TSharedPtr<IPropertyHandle> ParameterGroupProperty, class IDetailGroup& DetailGroup);
+
+	/** Enable/Disable all parameter properties in a group */
+	static void EnableGroupParameters(struct FEditorParameterGroup& ParameterGroup, bool ShouldEnable);
 
 	/** These methods generate the custom widgets for the various parameter types */
 	void CreateParameterValueWidget(class UDEditorParameterValue* Parameter, TSharedPtr<IPropertyHandle> ParameterProperty, IDetailGroup& DetailGroup);
@@ -114,6 +117,8 @@ private:
 	bool OverrideIsThinSurfaceEnabled() const;
 	bool OverrideDitheredLODTransitionEnabled() const;
 	bool OverrideOutputTranslucentVelocityEnabled() const;
+	bool OverrideHasPixelAnimationEnabled() const;
+	bool OverrideTessellationEnabled() const;
 	bool OverrideDisplacementScalingEnabled() const;
 	bool OverrideMaxWorldPositionOffsetDisplacementEnabled() const;
 	void OnOverrideOpacityClipMaskValueChanged(bool NewValue);
@@ -123,13 +128,16 @@ private:
 	void OnOverrideIsThinSurfaceChanged(bool NewValue);
 	void OnOverrideDitheredLODTransitionChanged(bool NewValue);
 	void OnOverrideOutputTranslucentVelocityChanged(bool NewValue);
+	void OnOverrideHasPixelAnimationChanged(bool NewValue);
+	void OnOverrideEnableTessellationChanged(bool NewValue);
 	void OnOverrideDisplacementScalingChanged(bool NewValue);
 	void OnOverrideMaxWorldPositionOffsetDisplacementChanged(bool NewValue);
+	bool OverrideCastDynamicShadowAsMaskedEnabled() const;
+	void OnOverrideCastDynamicShadowAsMaskedChanged(bool NewValue);
 
 private:
 	/** Object that stores all of the possible parameters we can edit */
 	UMaterialEditorInstanceConstant* MaterialEditorInstance;
-
 	/** Delegate to call to determine if hidden parameters should be shown */
 	FCusGetShowHiddenParameters ShowHiddenDelegate;
 

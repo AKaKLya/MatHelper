@@ -5,6 +5,16 @@
 #include "CoreMinimal.h"
 #include "MatHelperMgn.generated.h"
 
+#define DECLARE_NODE_MASK_PIN(Channel, R, G, B, A) FNodeMaskPin(FString(#Channel), FIntVector4(R, G, B, A))
+
+UENUM()
+enum class ESceneViewMethod : uint8
+{
+	// 创建SceneView时，自动设置为世界场景的视角.
+	Auto,
+	// 创建SceneView时，以选中的Actor为视角位置.
+	SelectActor,
+};
 
 USTRUCT()
 struct FNodeMaskPin
@@ -16,7 +26,11 @@ struct FNodeMaskPin
 
 	// X:R , Y:G , Z:B , W:A
 	UPROPERTY(EditAnywhere,Category = "Material")
-	FIntVector4 MaskValue ;
+	FIntVector4 MaskValue = FIntVector4(0,0,0,0);
+
+	FNodeMaskPin(){};
+	FNodeMaskPin(const FString& InName, const FIntVector4 InValue)
+		:ButtonName(InName),MaskValue(InValue){}
 };
 
 USTRUCT()
@@ -73,7 +87,11 @@ public:
 	void ModifyICON();
 
 public:
-	
+	// 创建SceneView时，选择视角的方式.
+	UPROPERTY(EditAnywhere,Category = "General")
+	ESceneViewMethod SceneViewMethod = ESceneViewMethod::Auto;
+
+public:
 	//材质资产的显示颜色，引擎默认是绿色(64,192,64)
 	UPROPERTY(EditAnywhere,Category = "Material")
 	FColor MaterialAssetColor = FColor(255,25,25);
@@ -97,7 +115,17 @@ public:
 	FVector2D BaseOffset = FVector2D(50,50);
 
 	UPROPERTY(EditAnywhere,Category = "Material")
-	TArray<FNodeMaskPin> MaskPinInfo;
+	TArray<FNodeMaskPin> MaskPinInfo =
+		{
+			DECLARE_NODE_MASK_PIN(R, 1, 0, 0, 0),
+			DECLARE_NODE_MASK_PIN(G, 0, 1, 0, 0),
+			DECLARE_NODE_MASK_PIN(B, 0, 0, 1, 0),
+			DECLARE_NODE_MASK_PIN(A, 0, 0, 0, 1),
+			DECLARE_NODE_MASK_PIN(RGB, 1, 1, 1, 0),
+			DECLARE_NODE_MASK_PIN(RGBA, 1, 1, 1, 1),
+			DECLARE_NODE_MASK_PIN(RG, 1, 1, 0, 0),
+			DECLARE_NODE_MASK_PIN(BA, 0, 0, 1, 1)
+		};
 	
 	// 自动分组关键词
 	UPROPERTY(EditAnywhere,Category = "Material")
@@ -105,8 +133,8 @@ public:
 
 	// 节点按钮信息
 	UPROPERTY(EditAnywhere,Category = "Material")
-	TArray<FNodeButton> NodeButtonInfo;
-
+	TArray<FNodeButton> NodeButtonInfo ;
+	
 public:
 	
 	// 将Niagara拖入定序器时，自动打开轨道并设置为 DesiredAge 模式.

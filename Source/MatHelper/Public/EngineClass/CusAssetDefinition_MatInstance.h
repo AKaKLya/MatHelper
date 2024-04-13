@@ -23,8 +23,7 @@ public:
 		return Categories;
 	}
 	virtual UThumbnailInfo* LoadThumbnailInfo(const FAssetData& InAsset) const override;
-	// UAssetDefinition End
-	
+
 	FColor Color = FColor(0,128,0);
 	virtual FText GetAssetDisplayName() const override { return NSLOCTEXT("AssetTypeActions", "AssetTypeActions_MaterialInstanceConstant", "Material Instance"); }
 	virtual FLinearColor GetAssetColor() const override { return FLinearColor(Color); }
@@ -32,4 +31,5 @@ public:
 	virtual EAssetCommandResult OpenAssets(const FAssetOpenArgs& OpenArgs) const override;
 	virtual bool CanImport() const override { return true; }
 	// UAssetDefinition End
+	
 };

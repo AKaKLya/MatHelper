@@ -42,7 +42,6 @@ private:
 	TArray<TSharedPtr<FString>> MaskPinOptions;
 	TArray<FIntVector4> MaskPinInfo;
 	FReply AddNodeMaskPin();
-	
 	int CurrentSelect = 0;
 
 	TSharedPtr<SEditableTextBox> InstanceText;
