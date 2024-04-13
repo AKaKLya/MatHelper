@@ -144,4 +144,7 @@ public:
 
 	UPROPERTY(EditAnywhere,Category = "Niagara")
 	bool CreateNiagaraAutoPlaySelection = true;
+
+private:
+	FSlateBrush* CreateHeaderBrush();
 };

@@ -17,20 +17,44 @@ UMatHelperMgn::UMatHelperMgn()
 
 void UMatHelperMgn::ModifyICON()
 {
+
 	auto PluginPath = IPluginManager::Get().FindPlugin("MatHelper")->GetBaseDir();
 	
 	FSlateStyleSet* Style = (FSlateStyleSet*)&FAppStyle::Get();
 	
+	FSlateBrush* MatIcon = CreateHeaderBrush();
+	
 	FString TheIConName = "Graph/" + IConName;
 	Style->SetContentRoot(PluginPath + "/Resources/");
-	Style->Set("AppIcon", new IMAGE_BRUSH_SVG(TheIConName, FVector2f(50.f, 50.f), FStyleColors::White));
+	if(IConName == "MatIcon")
+	{
+		Style->Set("AppIcon", MatIcon);
+	}
+	else
+	{
+		Style->Set("AppIcon", new IMAGE_BRUSH_SVG(TheIConName, FVector2f(50.f, 50.f), FStyleColors::White));
+	}
 	
 	UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
 	AssetEditorSubsystem->CloseAllEditorsForAsset(this);
 	AssetViewUtils::OpenEditorForAsset(this);
 }
 
+FSlateBrush* UMatHelperMgn::CreateHeaderBrush()
+{
+	FSlateBrush* SlateBrush = new FSlateBrush();
+	
+	const FString MaterialPath = FString("/MatHelper/Material/M_SlateIcon");
+	
+	UMaterial* Material = LoadObject<UMaterial>(nullptr, *MaterialPath);
+	UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(Material, this);
+	
+	DynamicMaterial->AddToRoot();
 
+	SlateBrush->SetResourceObject(DynamicMaterial);
+	SlateBrush->ImageSize = FVector2D(50.f, 50.f);
+	return SlateBrush;
+}
 
 void UMatHelperMgn::OpenNodesConfigFolder()
 {
