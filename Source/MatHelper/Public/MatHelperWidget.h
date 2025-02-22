@@ -2,8 +2,6 @@
 
 #pragma once
 #include "CoreMinimal.h"
-#include "Widgets/Layout/SScrollBox.h"
-#include "SMaterialPalette.h"
 
 struct FNodeButton;
 class UMatHelperMgn;
@@ -11,18 +9,14 @@ class UMaterialGraphNode;
 class FMatHelperModule;
 class IMaterialEditor;
 
-
-
-class SMatHelperWidget :public SMaterialPalette
+class SMatHelperWidget :public SCompoundWidget
 {
 public:
-
 	SLATE_BEGIN_ARGS(SMatHelperWidget) {}
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs,FMaterialEditor* InMatEditor);
 	FReply InitialButton();
-	TSharedPtr<SGraphActionMenu> GraphActionMenu;
 	
 private:
 	FMaterialEditor* MatEditorInterface = nullptr;
@@ -33,10 +27,10 @@ private:
 	void RefreshMaskPinSelection();
 	
 	FString PluginConfigPath;
-	inline bool CheckNode(UObject* Node);
+	static inline bool CheckNode(UObject* Node);
 	
 	TSharedPtr<SEditableTextBox> GroupText;
-	FReply SetNodeGroup(bool AutoGroup,bool AllGroup);
+	FReply SetNodeGroup(bool AutoGroup,bool AllGroup) const;
 	
 	//TSharedPtr<SEditableTextBox> MaskPinText;
 	TArray<TSharedPtr<FString>> MaskPinOptions;
@@ -48,23 +42,12 @@ private:
 	FReply CreateInstance();
 	FString MIEmptyPath = "/MatHelper/Material/MI_Empty";
 	
-	FReply FixFunctionNode();
-	FReply ToggleRefraction();
+	FReply FixFunctionNode() const;
+	FReply ToggleRefraction() const;
 	TArray<TSharedPtr<SButton>> NodeButtons;
 	
-	FReply CreateMatNode(int32 Index);
+	FReply CreateMatNode(int32 Index) const;
 	FReply RefreshButton();
-	FReply RemoveParameterType();
+	FReply RemoveParameterType() const;
 	
-protected:
-	// SMaterialPalette Function  Begin
-	virtual TSharedRef<SWidget> OnCreateWidgetForAction(FCreateWidgetForActionData* const InCreateData) override;
-	virtual void CollectAllActions(FGraphActionListBuilderBase& OutAllActions) override;
-	virtual FReply OnActionDragged(const TArray< TSharedPtr<FEdGraphSchemaAction> >& InActions, const FPointerEvent& MouseEvent) override;
-	
-	void MHCategorySelectionChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
-	void MHRefreshAssetInRegistry(const FAssetData& InAddedAssetData);
-	FString MHGetFilterCategoryName() const;
-	TSharedPtr<STextComboBox> CategoryComboBox;
-	// SMaterialPalette Function End
 };

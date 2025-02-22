@@ -4,14 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "AssetDefinitionDefault.h"
-#include "CusAssetDefinition_MatInterface.h"
 #include "CusAssetDefinition_Material.generated.h"
 
 
-
-/**
- * 
- */
 UCLASS()
 class MATHELPER_API UCusAssetDefinition_Material : public UAssetDefinitionDefault
 {

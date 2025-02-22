@@ -4,7 +4,6 @@
 #include "TAccessPrivate.inl"
 #include "AssetViewUtils.h"
 #include "EditorWidgetsModule.h"
-#include "GraphEditorDragDropAction.h"
 #include "IContentBrowserSingleton.h"
 #include "MaterialGraphNode_Knot.h"
 #include "MaterialPropertyHelpers.h"
@@ -18,12 +17,10 @@
 #include "MaterialGraph/MaterialGraphNode_Composite.h"
 #include "MaterialGraph/MaterialGraphNode_PinBase.h"
 #include "MaterialGraph/MaterialGraphNode_Root.h"
-#include "MaterialGraph/MaterialGraphSchema.h"
 #include "Materials/MaterialExpressionParameter.h"
 #include "Materials/MaterialExpressionTextureSampleParameter.h"
 #include "Materials/MaterialInstanceConstant.h"
 #include "Subsystems/EditorAssetSubsystem.h"
-#include "Widgets/Input/STextComboBox.h"
 #include "Windows/WindowsPlatformApplicationMisc.h"
 
 
@@ -37,16 +34,10 @@ struct AccessGraph
 
 template struct TAccessPrivateStub<AccessGraph,&FMaterialEditor::FocusedGraphEdPtr>;
 
-
-
 void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMatEditor)
 {
 	FEditorWidgetsModule& EditorWidgetsModule = FModuleManager::LoadModuleChecked<FEditorWidgetsModule>("EditorWidgets");
 	const TSharedRef<SWidget> AssetDiscoveryIndicator = EditorWidgetsModule.CreateAssetDiscoveryIndicator(EAssetDiscoveryIndicatorScaleMode::Scale_Vertical);
-
-	CategoryNames.Add(MakeShareable(new FString(TEXT("All"))));
-	CategoryNames.Add(MakeShareable(new FString(TEXT("Expressions"))));
-	CategoryNames.Add(MakeShareable(new FString(TEXT("Functions"))));
 	
 	FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	
@@ -60,76 +51,11 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 	SAssignNew(NodeButtonScrollBox,SScrollBox);
 
 	RefreshMaskPinSelection();
-	
+
 	this->ChildSlot
 	[
-		SNew(SBorder)
-		.Padding(2.0f)
-		.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
-		[
-		
-			SNew(SVerticalBox)
-			+SVerticalBox::Slot()
-			.FillHeight(MatHelper.MatHelperMgn->HeightRatio)
-			[
-			
-				NodeButtonScrollBox.ToSharedRef()
-			]
-
-			// Filter UI
-			+SVerticalBox::Slot()
-			.AutoHeight()
-			[
-				SNew(SHorizontalBox)
-
-				// Comment
-				+SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.AutoWidth()
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("Category", "Category: "))
-				]
-
-				// Combo button to select a class
-				+SHorizontalBox::Slot()
-					.VAlign(VAlign_Center)
-					[
-						SAssignNew(CategoryComboBox, STextComboBox)
-						.OptionsSource(&CategoryNames)
-						.OnSelectionChanged(this, &SMatHelperWidget::MHCategorySelectionChanged)
-						.InitiallySelectedItem(CategoryNames[0])
-					]
-			]
-			
-			// Content list
-			+SVerticalBox::Slot()
-					[
-						SNew(SOverlay)
-
-						+SOverlay::Slot()
-						.HAlign(HAlign_Fill)
-						.VAlign(VAlign_Fill)
-						[
-							// Old Expression and Function lists were auto expanded so do the same here for now
-							SAssignNew(GraphActionMenu, SGraphActionMenu)
-							.OnActionDragged(this, &SMatHelperWidget::OnActionDragged)
-							.OnCreateWidgetForAction(this, &SMatHelperWidget::OnCreateWidgetForAction)
-							.OnCollectAllActions(this, &SMatHelperWidget::CollectAllActions)
-							.AutoExpandActionMenu(true)
-						]
-
-						+SOverlay::Slot()
-							.HAlign(HAlign_Fill)
-							.VAlign(VAlign_Bottom)
-							.Padding(FMargin(24, 0, 24, 0))
-							[
-								// Asset discovery indicator
-								AssetDiscoveryIndicator
-							]
-					]
-	]];
-	
+		NodeButtonScrollBox.ToSharedRef()
+	];
 	
 	NodeButtonScrollBox->AddSlot()
 	.Padding(5.0f)
@@ -153,9 +79,9 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.Text(FText::FromString("Scene View"))
 		.VAlign(VAlign_Center)
 		.HAlign(HAlign_Center)
-		.OnClicked_Lambda([]()
+		.OnClicked_Lambda([&]()
 		{
-			FGlobalTabmanager::Get()->TryInvokeTab(FMatHelperModule::MaterialSceneViewEditorTabName);
+			MatEditorInterface->GetTabManager()->TryInvokeTab(FMatHelperModule::MaterialSceneViewEditorTabName);
 			return FReply::Handled();
 		})
 	];
@@ -314,7 +240,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 	InitialButton();
 }
 
-FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup,bool AllGroup)
+FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup,bool AllGroup) const
 {
 	bool ShouldRefresh = false;
 
@@ -329,53 +255,44 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup,bool AllGroup)
 	const FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	TArray<FString> Names = MatHelper.MatHelperMgn->AutoGroupKeys;
 	
-	TArray<UObject*> SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
+	auto SelectedNodes = MatEditorInterface->GetSelectedNodes();
 	MatEditorInterface->FocusWindow();
+	
+	FString GroupName = GroupText->GetText().ToString(); // 提前获取组名
+
+	const auto ProcessGroup = [&](auto* Parameter)
+	{
+		if (AutoGroup)
+		{
+			for (const FString& Name : Names)
+			{
+				if (Parameter->ParameterName.ToString().Contains(Name))
+				{
+					Parameter->Group = *Name;
+					break; // 找到第一个匹配项后退出
+				}
+			}
+		}
+		else
+		{
+			Parameter->Group = *GroupName;
+		}
+		ShouldRefresh = true;
+	};
 	
 	for(UObject* Node : SelectedNodes)
 	{
 		if(UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(Node))
 		{
-			if(CheckNode(MatNode) == false)
-			{
-				continue;
-			}
+			if(CheckNode(MatNode) == false) {continue;}
+
 			if(UMaterialExpressionParameter* Parameter = Cast<UMaterialExpressionParameter>(MatNode->MaterialExpression))
 			{
-				if(AutoGroup)
-				{
-					for(FString Name : Names)
-					{
-						if(Parameter->ParameterName.ToString().Contains(Name))
-						{
-							Parameter->Group = *Name;
-						}
-					}
-				}
-				else
-				{
-					Parameter->Group = *GroupText->GetText().ToString();
-				}
-				ShouldRefresh=true;
+				ProcessGroup(Parameter);
 			}
 			else if(UMaterialExpressionTextureSampleParameter* TexParameter = Cast<UMaterialExpressionTextureSampleParameter>(MatNode->MaterialExpression))
 			{
-				if(AutoGroup)
-				{
-					for(FString Name : Names)
-					{
-						if(TexParameter->ParameterName.ToString().Contains(Name))
-						{
-							TexParameter->Group = *Name;
-						}
-					}
-				}
-				else
-				{
-					TexParameter->Group = *GroupText->GetText().ToString();
-				}
-				ShouldRefresh=true;
-				
+				ProcessGroup(TexParameter);
 			}
 		}
 	}
@@ -480,10 +397,14 @@ FReply SMatHelperWidget::CreateInstance()
 	UMaterialInstanceConstant* ConstMat = static_cast<UMaterialInstanceConstant*>(NewMi);
 	const auto MaterialEditorInstance = NewObject<UMaterialEditorInstanceConstant>(GetTransientPackage(), NAME_None, RF_Transactional);
 	MaterialEditorInstance->SetSourceInstance(ConstMat);
-	for (int32 GroupIdx = 0; GroupIdx < MaterialEditorInstance->ParameterGroups.Num(); ++GroupIdx)
+
+	const int32 GroupNum = MaterialEditorInstance->ParameterGroups.Num();
+	for (int32 GroupIdx = 0; GroupIdx <GroupNum ; ++GroupIdx)
 	{
 		FEditorParameterGroup& ParameterGroup = MaterialEditorInstance->ParameterGroups[GroupIdx];
-		for (int32 ParamIdx = 0; ParamIdx < ParameterGroup.Parameters.Num(); ++ParamIdx)
+		
+		int32 ParameterNum = ParameterGroup.Parameters.Num();
+		for (int32 ParamIdx = 0; ParamIdx < ParameterNum; ++ParamIdx)
 		{
 			UDEditorParameterValue* Parameter = ParameterGroup.Parameters[ParamIdx];
 			FMaterialPropertyHelpers::OnOverrideParameter(true,Parameter,MaterialEditorInstance);
@@ -498,7 +419,7 @@ FReply SMatHelperWidget::CreateInstance()
 	return FReply::Handled();
 }
 
-FReply SMatHelperWidget::ToggleRefraction()
+FReply SMatHelperWidget::ToggleRefraction() const
 {
 	auto& Ref = MatEditorInterface->GetMaterialInterface()->GetMaterial()->RefractionMethod;
 	if (Ref == RM_None)
@@ -515,10 +436,9 @@ FReply SMatHelperWidget::ToggleRefraction()
 	return FReply::Handled();
 }
 
-FReply SMatHelperWidget::FixFunctionNode()
+FReply SMatHelperWidget::FixFunctionNode() const
 {
-	FMatHelperModule& MatHelper = FMatHelperModule::Get();
-	bool bNeedRefresh = false;
+	bool bNeedRefreshNode = false;
 	auto Nodes = MatEditorInterface->GetSelectedNodes().Array();
 	for(const auto Node : Nodes)
 	{
@@ -526,18 +446,16 @@ FReply SMatHelperWidget::FixFunctionNode()
 		if(Cast<UMaterialExpressionMaterialFunctionCall>(MatNode->MaterialExpression))
 		{
 			MatNode->RecreateAndLinkNode();
-			bNeedRefresh = true;
+			bNeedRefreshNode = true;
 		}
 	}
-	if(bNeedRefresh)
+	if(bNeedRefreshNode)
 	{
 		MatEditorInterface->UpdateMaterialAfterGraphChange();
 	}
 	return FReply::Handled();
 		
 }
-
-
 
 FReply SMatHelperWidget::InitialButton()
 {
@@ -572,13 +490,12 @@ FReply SMatHelperWidget::InitialButton()
 	return FReply::Handled();
 }
 
-FReply SMatHelperWidget::CreateMatNode(int32 Index)
+FReply SMatHelperWidget::CreateMatNode(int32 Index) const
 {
 	FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	const FString NodeFileName = PluginConfigPath + "AddNodeFile/" + MatHelper.MatHelperMgn->NodeButtonInfo[Index].ButtonName + ".txt";
-
-	const bool Exist = FPaths::FileExists(NodeFileName);
-	if(Exist == false)
+	
+	if(FPaths::FileExists(NodeFileName) == false)
 	{
 		return FReply::Handled();
 	}
@@ -610,8 +527,8 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index)
 	}
 
 	const FVector2D BaseOffset = MatHelper.MatHelperMgn->BaseOffset;
-	
-	auto Graph = MatEditorInterface->GetMaterialInterface()->GetMaterial()->MaterialGraph;
+
+	const TObjectPtr<UMaterialGraph> Graph = MatEditorInterface->GetMaterialInterface()->GetMaterial()->MaterialGraph;
 	if(SelectedNodes.Num() > 0)
 	{
 		UObject* SelectedNode = SelectedNodes[0];
@@ -663,7 +580,7 @@ FReply SMatHelperWidget::RefreshButton()
 bool ModifyName(FString& Name)
 {
 	const FString VersionsToReplace[] ={ TEXT(" (V2)"), TEXT(" (V3)"), TEXT(" (V4)"), TEXT(" (S)"), TEXT(" (T2d)"), TEXT(" (SB)")};
-
+	
 	for (auto& Version : VersionsToReplace)
 	{
 		if (Name.Contains(Version))
@@ -675,7 +592,7 @@ bool ModifyName(FString& Name)
 	return false; 
 }
 
-FReply SMatHelperWidget::RemoveParameterType()
+FReply SMatHelperWidget::RemoveParameterType() const
 {
 	bool ShouldRefresh = false;
 
@@ -714,9 +631,7 @@ FReply SMatHelperWidget::RemoveParameterType()
 	    MatEditorInterface->UpdateMaterialAfterGraphChange();
 	}
 	return FReply::Handled();
-	
 }
-
 
 void SMatHelperWidget::RefreshMaskPinSelection()
 {
@@ -739,162 +654,5 @@ inline bool SMatHelperWidget::CheckNode(UObject* Node)
 	if (Cast<UMaterialGraphNode_PinBase>(Node)) { CheckSuccess = false; }
 	return CheckSuccess;
 }
-
-#pragma region Palette
-
-TSharedRef<SWidget> SMatHelperWidget::OnCreateWidgetForAction(FCreateWidgetForActionData* const InCreateData)
-{
-	return SMaterialPalette::OnCreateWidgetForAction(InCreateData);
-}
-
-void SMatHelperWidget::CollectAllActions(FGraphActionListBuilderBase& OutAllActions)
-{
-	const UMaterialGraphSchema* Schema = GetDefault<UMaterialGraphSchema>();
-
-	FGraphActionMenuBuilder ActionMenuBuilder;
-
-	// Determine all possible actions
-	Schema->GetPaletteActions(ActionMenuBuilder, SMatHelperWidget::MHGetFilterCategoryName(), MatEditorInterface->MaterialFunction != NULL);
-
-	//@TODO: Avoid this copy
-	OutAllActions.Append(ActionMenuBuilder);
-}
-
-void SMatHelperWidget::MHCategorySelectionChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo)
-{
-	GraphActionMenu->RefreshAllActions(true);
-}
-
-
-FReply SMatHelperWidget::OnActionDragged(const TArray<TSharedPtr<FEdGraphSchemaAction>>& InActions,
-	const FPointerEvent& MouseEvent)
-{
-	if( InActions.Num() > 0 && InActions[0].IsValid() )
-	{
-		const TSharedPtr<FEdGraphSchemaAction> InAction = InActions[0];
-
-		return FReply::Handled().BeginDragDrop(FGraphSchemaActionDragDropAction::New(InAction));
-	}
-
-	return FReply::Unhandled();
-}
-
-void SMatHelperWidget::MHRefreshAssetInRegistry(const FAssetData& InAddedAssetData)
-{
-	if (InAddedAssetData.IsInstanceOf(UMaterialFunction::StaticClass()))
-	{
-		RefreshActionsList(true);
-	}
-}
-
-FString SMatHelperWidget::MHGetFilterCategoryName() const
-{
-	if (CategoryComboBox.IsValid())
-	{
-		return *CategoryComboBox->GetSelectedItem();
-	}
-	else
-	{
-		return TEXT("All");
-	}
-}
-#pragma endregion 
-
-#pragma region EngineClassCpp
-
-void SMaterialPaletteItem::Construct(const FArguments& InArgs, FCreateWidgetForActionData* const InCreateData)
-{
-	check(InCreateData->Action.IsValid());
-
-	const TSharedPtr<FEdGraphSchemaAction> GraphAction = InCreateData->Action;
-	ActionPtr = InCreateData->Action;
-
-	// Get the Hotkey chord if one exists for this action
-	const TSharedPtr<const FInputChord> HotkeyChord;
-	
-	// Find icons
-	const FSlateBrush* IconBrush = FAppStyle::GetBrush(TEXT("NoBrush"));
-	const FSlateColor IconColor = FSlateColor::UseForeground();
-	const FText IconToolTip = GraphAction->GetTooltipDescription();
-	const bool bIsReadOnly = false;
-
-	const TSharedRef<SWidget> IconWidget = CreateIconWidget( IconToolTip, IconBrush, IconColor );
-	const TSharedRef<SWidget> NameSlotWidget = CreateTextSlotWidget(InCreateData, bIsReadOnly );
-	const TSharedRef<SWidget> HotkeyDisplayWidget = CreateHotkeyDisplayWidget(HotkeyChord );
-	// Create the actual widget
-	this->ChildSlot
-	[
-		SNew(SHorizontalBox)
-		// Icon slot
-		+SHorizontalBox::Slot()
-		.AutoWidth()
-		[
-			IconWidget
-		]
-		// Name slot
-		+SHorizontalBox::Slot()
-		.FillWidth(1.f)
-		.VAlign(VAlign_Center)
-		.Padding(3,0)
-		[
-			NameSlotWidget
-		]
-		// Hotkey slot
-		+SHorizontalBox::Slot()
-		.AutoWidth()
-		.HAlign(HAlign_Right)
-		[
-			HotkeyDisplayWidget
-		]
-	];
-}
-
-TSharedRef<SWidget> SMaterialPaletteItem::CreateHotkeyDisplayWidget(const TSharedPtr<const FInputChord> HotkeyChord)
-{
-	FText HotkeyText;
-	if (HotkeyChord.IsValid())
-	{
-		HotkeyText = HotkeyChord->GetInputText();
-	}
-	return SNew(STextBlock)
-		.Text(HotkeyText);
-}
-
-FText SMaterialPaletteItem::GetItemTooltip() const
-{
-	return ActionPtr.Pin()->GetTooltipDescription();
-}
-
-FString SMaterialPalette::GetFilterCategoryName() const
-{
-	if (CategoryComboBox.IsValid())
-	{
-		return *CategoryComboBox->GetSelectedItem();
-	}
-	else
-	{
-		return TEXT("All");
-	}
-}
-
-TSharedRef<SWidget> SMaterialPalette::OnCreateWidgetForAction(FCreateWidgetForActionData* const InCreateData)
-{
-	return	SNew(SMaterialPaletteItem, InCreateData);
-}
-
-void SMaterialPalette::CollectAllActions(FGraphActionListBuilderBase& OutAllActions)
-{
-	const UMaterialGraphSchema* Schema = GetDefault<UMaterialGraphSchema>();
-
-	FGraphActionMenuBuilder ActionMenuBuilder;
-
-	// Determine all possible actions
-	Schema->GetPaletteActions(ActionMenuBuilder, GetFilterCategoryName(), MaterialEditorPtr.Pin()->MaterialFunction != NULL);
-
-	//@TODO: Avoid this copy
-	OutAllActions.Append(ActionMenuBuilder);
-}
-
-#pragma endregion 
 
 #undef LOCTEXT_NAMESPACE

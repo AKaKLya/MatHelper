@@ -4,12 +4,12 @@
 #include "EngineClass/CusAssetDefinition_MatInstance.h"
 #include "TAccessPrivate.inl"
 #include "IMaterialEditor.h"
-#include "IPropertyRowGenerator.h"
+
 #include "MaterialEditorModule.h"
+#include "IPropertyRowGenerator.h"
 #include "MaterialInstanceEditor.h"
 #include "SMaterialLayersFunctionsTree.h"
 #include "MaterialPropertyHelpers.h"
-#include "EngineClass/CusMaterialEditorInstanceDetailCustomization.h"
 #include "MaterialEditor/DEditorMaterialLayersParameterValue.h"
 #include "MaterialEditor/DEditorParameterValue.h"
 #include "MaterialEditor/DEditorScalarParameterValue.h"
@@ -18,7 +18,7 @@
 #include "ThumbnailRendering/SceneThumbnailInfoWithPrimitive.h"
 
 #define LOCTEXT_NAMESPACE "MaterialInstanceEditor"
-
+/*
 struct AccessDetails
 {
 	typedef TSharedPtr<class IDetailsView> (FMaterialInstanceEditor::*Type);
@@ -42,7 +42,7 @@ struct AccessShowAllMaterialParameter
 	typedef bool (FMaterialInstanceEditor::*Type);
 };
 template struct TAccessPrivateStub<AccessShowAllMaterialParameter,&FMaterialInstanceEditor::bShowAllMaterialParameters>;
-
+*/
 
 UThumbnailInfo* UCusAssetDefinition_MatInstance::LoadThumbnailInfo(const FAssetData& InAsset) const
 {
@@ -69,34 +69,12 @@ EAssetCommandResult UCusAssetDefinition_MatInstance::OpenAssets(const FAssetOpen
 	{
 		IMaterialEditorModule* MaterialEditorModule = &FModuleManager::LoadModuleChecked<IMaterialEditorModule>( "MaterialEditor" );
 		TSharedRef<IMaterialEditor> EditorRef = MaterialEditorModule->CreateMaterialInstanceEditor(OpenArgs.GetToolkitMode(), OpenArgs.ToolkitHost, MIC);
-
-		IMaterialEditor* Editor = &EditorRef.Get();
-		auto MatInstanceEditor = static_cast<FMaterialInstanceEditor*>(Editor);
-		auto Detail = MatInstanceEditor->*TAccessPrivate<AccessDetails>::Value;
-		auto Instance = MatInstanceEditor->*TAccessPrivate<AccessInstance>::Value;
-		auto Layer = MatInstanceEditor->*TAccessPrivate<AccessLayer>::Value;
-
-	
-		FOnGetDetailCustomizationInstance LayoutMICDetails = FOnGetDetailCustomizationInstance::CreateStatic(
-			&FCusMaterialInstanceParameterDetails::MakeInstance,Instance.Get());
-		
-		Detail->RegisterInstancedCustomPropertyLayout(UMaterialEditorInstanceConstant::StaticClass(),LayoutMICDetails);
-		
-		TArray<UObject*> SelectedObjects;
-		SelectedObjects.Add( Instance );
-		Detail->SetObjects( SelectedObjects, true );
-		if (Layer.IsValid())
-		{
-			Layer->NestedTree->MaterialEditorInstance=Instance;
-			Layer->Refresh();
-		}
 	}
 
 	return EAssetCommandResult::Handled;
 }
-
+/*
 #pragma region EngineClassCpp
-
 
 void SMaterialLayersFunctionsInstanceTree::AddLayer()
 {
@@ -471,26 +449,83 @@ void SMaterialLayersFunctionsInstanceTree::CreateGroupsWidget()
 }
 
 
+
 void SMaterialLayersFunctionsInstanceWrapper::Refresh()
 {
 	LayerParameter.Reset();
 	TSharedPtr<SHorizontalBox> HeaderBox;
 	NestedTree->CreateGroupsWidget();
 	LayerParameter = NestedTree->FunctionParameter;
-	FOnClicked 	OnChildButtonClicked = FOnClicked::CreateStatic(&FMaterialPropertyHelpers::OnClickedSaveNewMaterialInstance, ImplicitConv<UMaterialInterface*>(MaterialEditorInstance->SourceInstance), ImplicitConv<UObject*>(MaterialEditorInstance));
-	FOnClicked	OnSiblingButtonClicked = FOnClicked::CreateStatic(&FMaterialPropertyHelpers::OnClickedSaveNewMaterialInstance, MaterialEditorInstance->SourceInstance->Parent, ImplicitConv<UObject*>(MaterialEditorInstance));
+	FOnClicked 	OnChildButtonClicked = FOnClicked::CreateStatic(&FMaterialPropertyHelpers::OnClickedSaveNewMaterialInstance, MaterialEditorInstance->GetMaterialInterface(), ImplicitConv<UObject*>(MaterialEditorInstance));
+	FOnClicked	OnSiblingButtonClicked = FOnClicked::CreateStatic(&FMaterialPropertyHelpers::OnClickedSaveNewMaterialInstance, MaterialEditorInstance->GetParentMaterialInterface(), ImplicitConv<UObject*>(MaterialEditorInstance));
 
+#if ENABLE_MATERIAL_LAYER_PROTOTYPE
+	const float ThumbnailSize = 64.0f;
+	TSharedPtr<SBox> ThumbnailBox;
+	UObject* ThumbnailObject = MaterialEditorInstance->GetMaterialInterface().Get();
+	const TSharedPtr<FAssetThumbnail> AssetThumbnail = MakeShareable(new FAssetThumbnail(ThumbnailObject, ThumbnailSize, ThumbnailSize, NestedTree->GetTreeThumbnailPool()));
+	TSharedRef<SWidget> ThumbnailWidget = AssetThumbnail->MakeThumbnailWidget();
+	FText MaterialName = FText::FromName(MaterialEditorInstance->GetMaterialInterface()->GetFName());
+	
+#endif
+	
 	if (LayerParameter != nullptr)
 	{
+#if ENABLE_MATERIAL_LAYER_PROTOTYPE
+		FOnClicked OnRelinkToParent = FOnClicked::CreateSP(NestedTree.ToSharedRef(), &SMaterialSubstrateTree::RelinkLayersToParent);
+#else
 		FOnClicked OnRelinkToParent = FOnClicked::CreateSP(NestedTree.ToSharedRef(), &SMaterialLayersFunctionsInstanceTree::RelinkLayersToParent);
-
+#endif
+		
 		this->ChildSlot
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()
-				.Padding(0.0f)
+				.Padding(FMargin(0.0f, 0.0f, 0.0f, 10.0f))
 				.AutoHeight()
 				[
+#if ENABLE_MATERIAL_LAYER_PROTOTYPE
+					SAssignNew(HeaderBox, SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+							.HAlign(HAlign_Center)
+							.VAlign(VAlign_Center)
+							.Padding(4.0f)
+							.MaxWidth(ThumbnailSize)
+							[
+								SAssignNew(ThumbnailBox, SBox)
+								.MaxDesiredWidth(ThumbnailSize)
+								.MaxDesiredWidth(ThumbnailSize)
+								.MaxDesiredHeight(ThumbnailSize)
+								.MinDesiredHeight(ThumbnailSize)
+								[
+									ThumbnailWidget
+								]
+							]
+
+					+ SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					.AutoWidth()
+					.Padding(5.0f)
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							SNew(STextBlock)
+							.Text(MaterialName)
+							.TextStyle(FAppStyle::Get(), "LargeText")
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							SNew(STextBlock)
+							.Text(LOCTEXT("MaterialInstance", "Material Instance"))
+							.TextStyle(FAppStyle::Get(), "NormalText.Important")
+						]
+					]
+#else
 					SAssignNew(HeaderBox, SHorizontalBox)
 					+ SHorizontalBox::Slot()
 					.Padding(FMargin(4.0f, 0.0f))
@@ -501,6 +536,7 @@ void SMaterialLayersFunctionsInstanceWrapper::Refresh()
 						SNew(STextBlock)
 						.Text(LOCTEXT("MaterialLayers", "Material Layers"))
 					]
+#endif
 				]
 				+ SVerticalBox::Slot()
 				.Padding(FMargin(0.0f))
@@ -515,9 +551,15 @@ void SMaterialLayersFunctionsInstanceWrapper::Refresh()
 				.AutoWidth()
 				.VAlign(VAlign_Center)
 				[
+#if ENABLE_MATERIAL_LAYER_PROTOTYPE
+				PropertyCustomizationHelpers::MakeAddButton(FSimpleDelegate::CreateSP(NestedTree.Get(), &SMaterialSubstrateTree::AddRootNodeLayer))
+#else
 					PropertyCustomizationHelpers::MakeAddButton(FSimpleDelegate::CreateSP(NestedTree.Get(), &SMaterialLayersFunctionsInstanceTree::AddLayer))
+#endif
 				];
 		}
+
+#ifndef ENABLE_MATERIAL_LAYER_PROTOTYPE
 		HeaderBox->AddSlot()
 			.FillWidth(1.0f)
 			[
@@ -554,6 +596,7 @@ void SMaterialLayersFunctionsInstanceWrapper::Refresh()
 				.OnClicked(OnChildButtonClicked)
 				.ToolTipText(LOCTEXT("SaveToChildInstance", "Save To Child Instance"))
 			];
+#endif
 	}
 	else
 	{
@@ -569,8 +612,10 @@ void SMaterialLayersFunctionsInstanceWrapper::Refresh()
 			];
 	}
 }
+
+
 #pragma endregion
 
-
+*/
 
 #undef LOCTEXT_NAMESPACE
