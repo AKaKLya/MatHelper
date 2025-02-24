@@ -226,6 +226,7 @@ void FMatHelperModule::InitMatEditorHook()
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot()
+					.FillHeight(MatHelperMgn->HeightRatio)
 					.Padding(2.0f)
 					[
 						MhWidget
