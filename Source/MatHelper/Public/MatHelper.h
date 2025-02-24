@@ -54,7 +54,6 @@ private:
 	void AddDefaultSystemTracks(const AActor& SourceActor, const FGuid& Binding,TSharedPtr<ISequencer> Sequencer);
 	FDelegateHandle DefaultTrackHandle;
 	FDelegateHandle MaterialOpenHandle;
-
-	
+	FDelegateHandle MaterialInstanceOpenHandle;
 };
 
