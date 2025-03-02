@@ -1,5 +1,7 @@
 // Copyright AKaKLya 2024
 
+// ReSharper disable CppPassValueParameterByConstReference
+// ReSharper disable CppMemberFunctionMayBeStatic
 #include "MatHelper.h"
 
 #include "Engine/DeveloperSettings.h"
@@ -10,24 +12,24 @@
 #include "AssetViewUtils.h"
 #include "ButtonInfoEditor.h"
 #include "ILevelSequenceModule.h"
-#include "MatHelperMgn.h"
 #include "MatHelperWidget.h"
 #include "IMaterialEditor.h"
 #include "MaterialEditorModule.h"
 #include "EngineClass/CusAssetDefinition_Material.h"
 #include "MaterialEditor.h"
+#include "MatHelperHook.h"
 #include "MatHelperSettings.h"
 #include "MovieScene.h"
 #include "NiagaraActor.h"
 #include "NiagaraComponent.h"
 #include "NiagaraEditorModule.h"
+#include "NiagaraEditorStyle.h"
 #include "NiagaraSystem.h"
 #include "NiagaraSystemEditorData.h"
 #include "OuterlineSelectionCol.h"
 #include "SceneEditorView.h"
 #include "SceneOutlinerModule.h"
 #include "SMaterialPalette.h"
-#include "ButtonClass/SimpleButtonCommands.h"
 #include "Editor/Sequencer/Public/ISequencer.h"
 #include "EngineClass/CusAssetDefinition_MatInstance.h"
 #include "Framework/Notifications/NotificationManager.h"
@@ -36,55 +38,32 @@
 #include "Kismet/KismetInternationalizationLibrary.h"
 #include "MovieScene/MovieSceneNiagaraSystemSpawnSection.h"
 #include "MovieScene/MovieSceneNiagaraSystemTrack.h"
-#include <type_traits>
+#include "Styling/SlateStyleMacros.h"
+#include "Styling/SlateStyleRegistry.h"
 
-#pragma region PrivateAccess
 
-// 用于访问私有成员变量.
-namespace MatHelperHook
+#define LOCTEXT_NAMESPACE "FMatHelperModule"
+#define RootToContentDir Style->RootToContentDir
+// 访问私有成员变量.
+namespace AccessPrivateHelper
 {
 	//Get protected struct FCompoundWidgetOneChildSlot type
-	class SCompoundWidgetExposed : public SCompoundWidget 
+	class SCompoundWidgetExposed : public SCompoundWidget
 	{
 	public:
 		// 将 protected 嵌套类型提升为 public
-		using FCompoundWidgetOneChildSlot = SCompoundWidget::FCompoundWidgetOneChildSlot;
+		using FCompoundWidgetOneChildSlot = FCompoundWidgetOneChildSlot;
 	};
-	struct AccessPalette
-	{
-		typedef TSharedPtr<class SMaterialPalette> (FMaterialEditor::*Type);
-	};
+
 	using FChildSlotType = SCompoundWidgetExposed::FCompoundWidgetOneChildSlot;
 	//Get protected struct FCompoundWidgetOneChildSlot type
-	
-	struct AccessSlot
-	{
-		typedef FChildSlotType (SCompoundWidget::*Type);
-	};
-	
-	struct AccessNiagaraTrackHandle
-	{
-		typedef FDelegateHandle (FNiagaraEditorModule::*Type);
-	};
-	
-	struct AccessNiagaraAgeUpdateMode
-	{
-		typedef ENiagaraAgeUpdateMode (UMovieSceneNiagaraSystemSpawnSection::*Type);
-	};
 }
-using namespace MatHelperHook;
+using namespace AccessPrivateHelper;
 
-template struct TAccessPrivateStub<AccessSlot,&SCompoundWidget::ChildSlot>;
-
-template struct TAccessPrivateStub<AccessPalette,&FMaterialEditor::Palette>;
-
-template struct TAccessPrivateStub<AccessNiagaraTrackHandle,&FNiagaraEditorModule::DefaultTrackHandle>;
-
-template struct TAccessPrivateStub<AccessNiagaraAgeUpdateMode,&UMovieSceneNiagaraSystemSpawnSection::AgeUpdateMode>;
-
-#pragma endregion
-
-#define LOCTEXT_NAMESPACE "FMatHelperModule"
+DEFINE_ACCESS_PRIVATE(AccessSlot,SCompoundWidget,FChildSlotType,ChildSlot)
+DEFINE_ACCESS_PRIVATE(AccessPalette,FMaterialEditor, TSharedPtr<SMaterialPalette>,Palette)
+DEFINE_ACCESS_PRIVATE(AccessNiagaraTrackHandle,FNiagaraEditorModule,FDelegateHandle,DefaultTrackHandle)
+DEFINE_ACCESS_PRIVATE(AccessNiagaraAgeUpdateMode,UMovieSceneNiagaraSystemSpawnSection,ENiagaraAgeUpdateMode,AgeUpdateMode)
 
 namespace MatHelperSpace
 {
@@ -99,10 +78,11 @@ namespace MatHelperSpace
 	const FName SceneViewEditorTabName7 = "SceneEditorView7";
 	const FName SceneViewEditorTabName8 = "SceneEditorView8";
 	const FName SceneViewEditorTabName9 = "SceneEditorView9";
+
 	const FName MaterialInstanceSceneViewEditorTabName = "MaterialInstanceSceneEditorView";
-	const FName NiagaraSceneViewEditorTabName = "NiagaraSceneViewEditorTabName";
+	const FName NiagaraSceneViewEditorTabName = "HookNiagaraSceneViewEditorTabName";
 	TSharedRef<ISceneOutlinerColumn> OnCreateOutlinerColumn(ISceneOutliner& SceneOutliner);
-	
+
 	static bool HasPlayWorld();
 	static bool HasNoPlayWorld();
 	static bool CanShowCommonMaps();
@@ -112,6 +92,8 @@ namespace MatHelperSpace
 }
 using namespace MatHelperSpace;
 
+
+
 FMatHelperModule& FMatHelperModule::Get()
 {
 	return FModuleManager::Get().GetModuleChecked<FMatHelperModule>("MatHelper");
@@ -120,10 +102,16 @@ FMatHelperModule& FMatHelperModule::Get()
 void FMatHelperModule::StartupModule()
 {
 	InitPluginInfo();
+	MatHelperHook::HookMatEditor();
+	MatHelperHook::HookNiagaraTabRegister();
+	
 	RegisterTab();
 	InitMatEditorHook();
 	InitNiagaraEditorHook();
 	RegisterGameEditorMenus();
+	
+	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
+	PropertyModule.RegisterCustomClassLayout(UMatHelperSettings::StaticClass()->GetFName(), FOnGetDetailCustomizationInstance::CreateStatic(&FMatHelperSettingsCustomization::MakeInstance));
 }
 
 void FMatHelperModule::ShutdownModule()
@@ -137,24 +125,17 @@ void FMatHelperModule::ShutdownModule()
 	{
 		IMaterialEditorModule& MatInterface = IMaterialEditorModule::Get();
 		MatInterface.OnMaterialEditorOpened().Remove(MaterialOpenHandle);
-		MatInterface.OnMaterialInstanceEditorOpened().Remove(MaterialOpenHandle);	
+		MatInterface.OnMaterialInstanceEditorOpened().Remove(MaterialOpenHandle);
 	}
 }
 
 void FMatHelperModule::InitPluginInfo()
 {
 	PluginPath = IPluginManager::Get().FindPlugin("MatHelper")->GetBaseDir();
-	MatHelperMgn = LoadObject<UMatHelperMgn>(nullptr,TEXT("/MatHelper/MatHelper.MatHelper"));
-	
-	FSimpleButtonStyle::Initialize();
-	FSimpleButtonStyle::ReloadTextures();
-	FSimpleButtonCommands::Register();
-	
-	PlayNiagaraCommands = MakeShareable(new FUICommandList);
-	PlayNiagaraCommands->MapAction(
-		FSimpleButtonCommands::Get().PlayNiagaraAction,
-		FExecuteAction::CreateStatic(&PlayNiagaraOnEditorWorld),
-		FCanExecuteAction());
+	Style = MakeUnique<FSlateStyleSet>("MatHelperStyle");
+	Style->SetContentRoot(IPluginManager::Get().FindPlugin("MatHelper")->GetBaseDir() / TEXT("Resources"));
+	Style->Set("SimpleButton.Niagara", new IMAGE_BRUSH(TEXT("NiagaraIcon"), FVector2D(50,50)));
+	FSlateStyleRegistry::RegisterSlateStyle(*Style);
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FMatHelperModule::RegisterButton));
 }
 
@@ -166,176 +147,192 @@ void FMatHelperModule::RegisterTab()
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
 
 	///////////////////////////////////////////////////////////////////
-	auto RegisterSceneView = [&](const FName& ID,const FString& Name)
-	{
-		FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ID, FOnSpawnTab::CreateRaw(this, &FMatHelperModule::OnSpawnSceneEditorView))
-		.SetDisplayName(FText::FromString(Name))
-		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports"))
-		.SetMenuType(ETabSpawnerMenuType::Hidden);
-	};
-	
-	RegisterSceneView(SceneViewEditorTabName,"SceneView");
-	RegisterSceneView(MaterialSceneViewEditorTabName,"SceneView");
-	RegisterSceneView(MaterialInstanceSceneViewEditorTabName,"SceneView");
-	RegisterSceneView(NiagaraSceneViewEditorTabName,"SceneView");
+	auto RegisterSceneView = [&](const FName& ID, const FString& Name)
+		{
+			FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ID, FOnSpawnTab::CreateRaw(this, &FMatHelperModule::OnSpawnSceneEditorView))
+				.SetDisplayName(FText::FromString(Name))
+				.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports"))
+				.SetMenuType(ETabSpawnerMenuType::Hidden);
+		};
 	
 	///////////////////////////////////////////////////////////////////
-	RegisterSceneView(SceneViewEditorTabName1,"SceneView 1");
-	RegisterSceneView(SceneViewEditorTabName2,"SceneView 2");
-	RegisterSceneView(SceneViewEditorTabName3,"SceneView 3");
-	RegisterSceneView(SceneViewEditorTabName4,"SceneView 4");
-	RegisterSceneView(SceneViewEditorTabName5,"SceneView 5");
-	RegisterSceneView(SceneViewEditorTabName6,"SceneView 6");
-	RegisterSceneView(SceneViewEditorTabName7,"SceneView 7");
-	RegisterSceneView(SceneViewEditorTabName8,"SceneView 8");
-	RegisterSceneView(SceneViewEditorTabName9,"SceneView 9");
+	RegisterSceneView(SceneViewEditorTabName1, "SceneView 1");
+	RegisterSceneView(SceneViewEditorTabName2, "SceneView 2");
+	RegisterSceneView(SceneViewEditorTabName3, "SceneView 3");
+	RegisterSceneView(SceneViewEditorTabName4, "SceneView 4");
+	RegisterSceneView(SceneViewEditorTabName5, "SceneView 5");
+	RegisterSceneView(SceneViewEditorTabName6, "SceneView 6");
+	RegisterSceneView(SceneViewEditorTabName7, "SceneView 7");
+	RegisterSceneView(SceneViewEditorTabName8, "SceneView 8");
+	RegisterSceneView(SceneViewEditorTabName9, "SceneView 9");
 	///////////////////////////////////////////////////////////////////
 }
 
 
 void FMatHelperModule::InitMatEditorHook()
 {
+	const UMatHelperSettings* MatHelperSettings = GetDefault<UMatHelperSettings>();
 	// 修改资产图标颜色，一眼区分材质和材质实例
 	const UCusAssetDefinition_Material* MaterialDefinition = Cast<UCusAssetDefinition_Material>(UAssetDefinitionRegistry::Get()->GetAssetDefinitionForClass(UMaterial::StaticClass()));
 	UCusAssetDefinition_Material* NonConstMaterialDefinition = const_cast<UCusAssetDefinition_Material*>(MaterialDefinition);
-	NonConstMaterialDefinition->Color = MatHelperMgn->MaterialAssetColor;
-	
+	NonConstMaterialDefinition->Color = MatHelperSettings->MaterialAssetColor;
+
 	const UCusAssetDefinition_MatInstance* MaterialInstanceDefinition = Cast<UCusAssetDefinition_MatInstance>(UAssetDefinitionRegistry::Get()->GetAssetDefinitionForClass(UMaterialInstanceConstant::StaticClass()));
 	UCusAssetDefinition_MatInstance* NonConstMaterialInstanceDefinition = const_cast<UCusAssetDefinition_MatInstance*>(MaterialInstanceDefinition);
-	NonConstMaterialInstanceDefinition->Color = MatHelperMgn->MaterialInstanceAssetColor;
+	NonConstMaterialInstanceDefinition->Color = MatHelperSettings->MaterialInstanceAssetColor;
 	// 修改资产图标颜色，一眼区分材质和材质实例
-	
+
 	IMaterialEditorModule& MatInterface = IMaterialEditorModule::Get();
 	
 	MaterialOpenHandle = MatInterface.OnMaterialEditorOpened().AddLambda([&](const TWeakPtr<IMaterialEditor>& InMatEditor)
 		{
 			IMaterialEditor* IMatEditor = InMatEditor.Pin().Get();
+		
+			IMatEditor->OnMaterialEditorClosed().AddLambda([&]()
+			{
+				MhWidgets.RemoveAll([](auto& WeakWidget) { return !WeakWidget.IsValid(); });
+			});
+		
 			FMaterialEditor* MatEditor = static_cast<FMaterialEditor*>(IMatEditor);
 			TSharedPtr<SMaterialPalette>& Palette = MatEditor->*TAccessPrivate<AccessPalette>::Value;
 		
 			IMatEditor->OnRegisterTabSpawners().AddLambda([&](const TSharedRef<class FTabManager>& TabManager)
-			{
-				// 在原有控件的基础上 添加自定义的控件.
-				auto MhWidget = SNew(SMatHelperWidget, MatEditor);
-				MhWidgets.RemoveAll([](auto& WeakWidget){ return !WeakWidget.IsValid(); });
-				MhWidgets.Add(MhWidget);
-				
-				FChildSlotType& ChildSlot = Palette.Get()->*TAccessPrivate<AccessSlot>::Value;
-				TSharedRef<SWidget> OriginalContent = ChildSlot.GetWidget();
-				ChildSlot
-				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot()
-					.FillHeight(MatHelperMgn->HeightRatio)
-					.Padding(2.0f)
-					[
-						MhWidget
-					]
-					+ SVerticalBox::Slot()
-					[
-						OriginalContent //原有的控件
-					]
-				];
-				
-				//注册场景窗口.
-				TabManager->RegisterTabSpawner(MaterialSceneViewEditorTabName, FOnSpawnTab::CreateRaw(this, &FMatHelperModule::OnSpawnSceneEditorView))
-					.SetDisplayName(FText::FromString("SceneView"))
-					.SetGroup(TabManager->GetLocalWorkspaceMenuRoot())
-					.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports"));
-			});
+				{
+					// 在原有控件的基础上 添加自定义的控件.
+					auto MhWidget = SNew(SMatHelperWidget, MatEditor);
+					MhWidgets.Add(MhWidget);
+
+					FChildSlotType& ChildSlot = Palette.Get()->*TAccessPrivate<AccessSlot>::Value;
+					TSharedRef<SWidget> OriginalContent = ChildSlot.GetWidget();
+					ChildSlot
+						[
+							SNew(SVerticalBox)
+								+ SVerticalBox::Slot()
+								.FillHeight(GetDefault<UMatHelperSettings>()->HeightRatio)
+								.Padding(2.0f)
+								[
+									MhWidget
+								]
+								+ SVerticalBox::Slot()
+								[
+									OriginalContent //原有的控件
+								]
+						];
+
+					//注册场景窗口.
+					TabManager->RegisterTabSpawner(MaterialSceneViewEditorTabName, FOnSpawnTab::CreateRaw(this, &FMatHelperModule::OnSpawnSceneEditorView))
+						.SetDisplayName(FText::FromString("SceneView"))
+						.SetGroup(TabManager->GetLocalWorkspaceMenuRoot())
+						.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports"));
+				});
 		});
 
 	MaterialInstanceOpenHandle = MatInterface.OnMaterialInstanceEditorOpened().AddLambda([&](TWeakPtr<IMaterialEditor> InMatInstanceEditor)
-	{
-		if(InMatInstanceEditor.Pin())
 		{
-			IMaterialEditor* Editor = InMatInstanceEditor.Pin().Get();
-			FMaterialInstanceEditor* MatInstanceEditor = static_cast<FMaterialInstanceEditor*>(Editor);
-			
-			Editor->OnRegisterTabSpawners().AddLambda([this](const TSharedRef<class FTabManager>& TabManager)
+			if (InMatInstanceEditor.Pin())
 			{
-				TabManager->RegisterTabSpawner(MaterialInstanceSceneViewEditorTabName, FOnSpawnTab::CreateRaw(this, &FMatHelperModule::OnSpawnSceneEditorView))
-					.SetDisplayName(FText::FromString("SceneView"))
-					.SetGroup(TabManager->GetLocalWorkspaceMenuRoot())
-					.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports"));
-			});
+				IMaterialEditor* Editor = InMatInstanceEditor.Pin().Get();
+				FMaterialInstanceEditor* MatInstanceEditor = static_cast<FMaterialInstanceEditor*>(Editor);
 
-			//Hook SceneView Button 
-			TSharedPtr<FExtender> ToolbarExtender = MakeShareable(new FExtender);
-			ToolbarExtender->AddToolBarExtension("Stats",EExtensionHook::After,nullptr,FToolBarExtensionDelegate::CreateLambda([=](FToolBarBuilder& ToolbarBuilder)
-			{
-				ToolbarBuilder.BeginSection(TEXT("MatHelper"));
-				{
-					ToolbarBuilder.AddToolBarButton(
-					FUIAction(FExecuteAction::CreateLambda([&]()
+				Editor->OnRegisterTabSpawners().AddLambda([this](const TSharedRef<class FTabManager>& TabManager)
 					{
-						MatInstanceEditor->GetTabManager()->TryInvokeTab(MaterialInstanceSceneViewEditorTabName);
-					})),
-					FName(TEXT("SceneView")),
-					FText::FromString("SceneView"),
-					FText::FromString("SceneView"),
-					FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
-					EUserInterfaceActionType::Button
-					);
-				}
-				ToolbarBuilder.EndSection();
-			}));
-			auto Mana = MatInstanceEditor->GetToolBarExtensibilityManager();
-			Mana->AddExtender(ToolbarExtender);
-		}
-	});
-	
-}
+						TabManager->RegisterTabSpawner(MaterialInstanceSceneViewEditorTabName, FOnSpawnTab::CreateRaw(this, &FMatHelperModule::OnSpawnSceneEditorView))
+							.SetDisplayName(FText::FromString("SceneView"))
+							.SetGroup(TabManager->GetLocalWorkspaceMenuRoot())
+							.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports"));
+					});
 
-void FMatHelperModule::NiagaraToolBarExtend(FToolBarBuilder& ToolbarBuilder)
-{
-	ToolbarBuilder.BeginSection(TEXT("MatHelper"));
-	{
-		ToolbarBuilder.AddToolBarButton(
-			FUIAction(FExecuteAction::CreateStatic(&PlayNiagaraOnEditorWorld)),
-			FName(TEXT("Play Niagara")),
-			FText::FromString("Play Niagara"),
-			FText::FromString("Play Niagara"),
-			FSlateIcon(TEXT("SimpleButtonStyle"),"SimpleButton.Niagara"),
-			EUserInterfaceActionType::Button
-		);
+				//Hook SceneView Button 
+				TSharedPtr<FExtender> ToolbarExtender = MakeShareable(new FExtender);
+				ToolbarExtender->AddToolBarExtension("Stats", EExtensionHook::After, nullptr, FToolBarExtensionDelegate::CreateLambda([=](FToolBarBuilder& ToolbarBuilder)
+					{
+						ToolbarBuilder.BeginSection(TEXT("MatHelper"));
+						{
+							ToolbarBuilder.AddToolBarButton(
+								FUIAction(FExecuteAction::CreateLambda([=]()
+									{
+										MatInstanceEditor->GetTabManager()->TryInvokeTab(MaterialInstanceSceneViewEditorTabName);
+									})),
+								FName(TEXT("SceneView")),
+								FText::FromString("SceneView"),
+								FText::FromString("SceneView"),
+								FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
+								EUserInterfaceActionType::Button
+							);
+						}
+						ToolbarBuilder.EndSection();
+					}));
+				auto Mana = MatInstanceEditor->GetToolBarExtensibilityManager();
+				Mana->AddExtender(ToolbarExtender);
+			}
+		});
 
-		/*ToolbarBuilder.AddToolBarButton(
-			FUIAction(FExecuteAction::CreateLambda([&]()
-			{
-				FGlobalTabmanager::Get()->TryInvokeTab(NiagaraSceneViewEditorTabName);
-			})),
-			FName(TEXT("SceneView")),
-			FText::FromString("SceneView"),
-			FText::FromString("SceneView"),
-			FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
-			EUserInterfaceActionType::Button
-		);*/
-	}
-	ToolbarBuilder.EndSection();
 }
 
 void FMatHelperModule::InitNiagaraEditorHook()
 {
+	const UMatHelperSettings* MatHelperSettings = GetDefault<UMatHelperSettings>();
 	FNiagaraEditorModule& NiagaraEditorModule = FModuleManager::LoadModuleChecked<FNiagaraEditorModule>("NiagaraEditor");
-	{
+	/*{
 		TSharedPtr<FExtender> ToolbarExtender = MakeShareable(new FExtender);
 		ToolbarExtender->AddToolBarExtension("Compile", EExtensionHook::After, nullptr, FToolBarExtensionDelegate::CreateRaw(this, &FMatHelperModule::NiagaraToolBarExtend));
 		NiagaraEditorModule.GetToolBarExtensibilityManager()->AddExtender(ToolbarExtender);;
-	}
-	if(MatHelperMgn->OverrideNiagaraSequenceMode)
+	}*/
+	if (MatHelperSettings->OverrideNiagaraSequenceMode)
 	{
 		ILevelSequenceModule& LevelSequenceModule = FModuleManager::LoadModuleChecked<ILevelSequenceModule>("LevelSequence");
-		
-		const FDelegateHandle NiagaraTrackHandle = &NiagaraEditorModule->*TAccessPrivate<AccessNiagaraTrackHandle>::Value;
+
+		const FDelegateHandle NiagaraTrackHandle = NiagaraEditorModule.*TAccessPrivate<AccessNiagaraTrackHandle>::Value;
 		LevelSequenceModule.OnNewActorTrackAdded().Remove(NiagaraTrackHandle);
-		DefaultTrackHandle = LevelSequenceModule.OnNewActorTrackAdded().AddRaw(this,&FMatHelperModule::AddDefaultSystemTracks);
+		DefaultTrackHandle = LevelSequenceModule.OnNewActorTrackAdded().AddRaw(this, &FMatHelperModule::AddDefaultSystemTracks);
 	}
-	
-	if(MatHelperMgn->CreateNiagaraAutoPlaySelection)
+
+	if (MatHelperSettings->CreateNiagaraAutoPlaySelection)
 	{
 		RegisterNiagaraAutoPlayer();
 	}
+
+
+	MatHelperHook::OnNiagaraRegisterTabFactories.AddLambda([&](const TSharedRef<class FTabManager>& InTabManager)
+	{
+		InTabManager->RegisterTabSpawner(NiagaraSceneViewEditorTabName, FOnSpawnTab::CreateRaw(this, &FMatHelperModule::OnSpawnSceneEditorView))
+		.SetDisplayName(LOCTEXT("SceneView", "SceneView"))
+		.SetIcon(FSlateIcon(FNiagaraEditorStyle::Get().GetStyleSetName(), "Tab.Viewport"));
+	});
+	
+	MatHelperHook::OnNiagaraExtendToolbar.AddLambda([this](FToolBarBuilder& ToolbarBuilder, FNiagaraSystemToolkit* Toolkit)
+	{
+		ToolbarBuilder.BeginSection("SceneView");
+		{
+			const FUIAction BakerToggleAction(
+				FExecuteAction::CreateLambda(
+					[TabManager = Toolkit->GetTabManager()]()
+					{
+						TabManager->TryInvokeTab(NiagaraSceneViewEditorTabName);
+					}
+				)
+			);
+	
+			ToolbarBuilder.AddToolBarButton(
+				BakerToggleAction,
+				NAME_None,
+				FText::FromString("SceneView"),
+				FText::FromString("SceneView"),
+				FSlateIcon(FNiagaraEditorStyle::Get().GetStyleSetName(), "Tab.Viewport"),
+				EUserInterfaceActionType::ToggleButton
+			);
+			
+			ToolbarBuilder.AddToolBarButton(
+			FUIAction(FExecuteAction::CreateStatic(&PlayNiagaraOnEditorWorld)),
+			FName(TEXT("Play Niagara")),
+			FText::FromString("Play Niagara"),
+			FText::FromString("Play Niagara"),
+			GetBrush("SimpleButton.Niagara"),
+			EUserInterfaceActionType::Button
+		);
+		}
+	ToolbarBuilder.EndSection();
+	});
 }
 
 
@@ -344,15 +341,19 @@ TSharedRef<ISceneOutlinerColumn> MatHelperSpace::OnCreateOutlinerColumn(ISceneOu
 	return MakeShareable(new FOuterlineSelectionLockCol(SceneOutliner));
 }
 
+FSlateIcon FMatHelperModule::GetBrush(const FString& Name) {
+	return FSlateIcon(Style->GetStyleSetName(), FName(*Name));
+}
+
 void FMatHelperModule::PlayNiagaraOnEditorWorld()
 {
 	TArray<AActor*> NiagaraActors;
 	UWorld* World = GEditor->GetEditorWorldContext().World();
-	UGameplayStatics::GetAllActorsOfClass(World,ANiagaraActor::StaticClass(),NiagaraActors);
-	for(AActor* NiagaraActor : NiagaraActors)
+	UGameplayStatics::GetAllActorsOfClass(World, ANiagaraActor::StaticClass(), NiagaraActors);
+	for (AActor* NiagaraActor : NiagaraActors)
 	{
 		auto Niagara = Cast<ANiagaraActor>(NiagaraActor);
-		if(Niagara->Tags.Contains("NiagaraAutoPlay"))
+		if (Niagara->Tags.Contains("NiagaraAutoPlay"))
 		{
 			UNiagaraComponent* NiagaraComponent = Niagara->GetNiagaraComponent();
 			NiagaraComponent->Activate(true);
@@ -363,249 +364,208 @@ void FMatHelperModule::PlayNiagaraOnEditorWorld()
 
 void FMatHelperModule::EditorNotify(const FString& NotifyInfo, SNotificationItem::ECompletionState State)
 {
-	FNotificationInfo Info( FText::FromString(NotifyInfo) );
+	FNotificationInfo Info(FText::FromString(NotifyInfo));
 	Info.FadeInDuration = 0.5f;
 	Info.FadeOutDuration = 0.5f;
 	Info.ExpireDuration = 5.0f;
-	const auto NotificationItem = FSlateNotificationManager::Get().AddNotification( Info );
+	const auto NotificationItem = FSlateNotificationManager::Get().AddNotification(Info);
 	NotificationItem->SetCompletionState(State);
 	NotificationItem->ExpireAndFadeout();
 }
 
 void FMatHelperModule::RefreshAllWidgetButton()
 {
-	for(auto MhWidget : MhWidgets)
+	for (auto MhWidget : MhWidgets)
 	{
-		if(MhWidget.Pin().IsValid())
+		if (MhWidget.Pin().IsValid())
 		{
-			MhWidget.Pin().Get()->InitialButton();	
+			MhWidget.Pin().Get()->InitialButton();
 		}
 	}
+	MhWidgets.RemoveAll([](auto& WeakWidget) { return !WeakWidget.IsValid(); });
 }
 
 TSharedRef<SDockTab> FMatHelperModule::OnSpawnButtonInfoEditor(const FSpawnTabArgs& SpawnTabArgs)
 {
+	const UMatHelperSettings* MatHelperSettings = GetDefault<UMatHelperSettings>();
 	return SNew(SDockTab)
-			.TabRole(ETabRole::NomadTab)
-			[
-					SNew(SButtonInfoEditor,MatHelperMgn->NodeButtonInfo)
-			];
+		.TabRole(NomadTab)
+		[
+			SNew(SButtonInfoEditor, MatHelperSettings->NodeButtonInfo)
+		];
 }
 
 
 TSharedRef<SDockTab> FMatHelperModule::OnSpawnSceneEditorView(const FSpawnTabArgs& SpawnTabArgs)
 {
 	return SNew(SDockTab)
-		.TabRole(ETabRole::NomadTab)
+		.TabRole(NomadTab)
 		[
-				SNew(SceneEditorView)
+			SNew(SceneEditorView)
 		];
-			
+
 }
 
 
 void FMatHelperModule::RegisterButton()
 {
 	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("MainFrame.MainMenu.Tools");
+	FToolMenuSection& MenuSection = Menu->AddSection("MatHelper");
+	MenuSection.AddDynamicEntry("MatHelper", FNewToolMenuSectionDelegate::CreateLambda([&](FToolMenuSection& InSection)
 	{
-		FToolMenuSection& MenuSection = Menu->AddSection("MatHelper", LOCTEXT("FSwitchCNModule", "MatHelper"));
-		MenuSection.AddDynamicEntry("MatHelper", FNewToolMenuSectionDelegate::CreateLambda([&](FToolMenuSection& InSection)
-		{
 #pragma region MatHelper
-			InSection.AddEntry(FToolMenuEntry::InitSubMenu("MatHelper",FText::FromString("MatHelper"),FText::GetEmpty(),FNewToolMenuDelegate::CreateLambda([&](UToolMenu* InToolMenu)
+		InSection.AddEntry(FToolMenuEntry::InitSubMenu("MatHelper", FText::FromString("MatHelper"), FText::GetEmpty(), FNewToolMenuDelegate::CreateLambda([&](UToolMenu* InToolMenu)
+		{
+			FToolMenuSection& Section = InToolMenu->FindOrAddSection("MatHelper");
+			Section.AddEntry(FToolMenuEntry::InitMenuEntry(
+			"MatHelper",
+			LOCTEXT("FMatHelperModule", "MatHelper"),
+			LOCTEXT("FMatHelperModule", "Open MatHelper Manager"),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
+			FUIAction(FExecuteAction::CreateLambda([]()
 			{
-				FToolMenuSection& Section = InToolMenu->FindOrAddSection("MatHelper");
-				Section.AddEntry(FToolMenuEntry::InitMenuEntry(
-					"MatHelper",
-					LOCTEXT("FMatHelperModule", "MatHelper"),
-					LOCTEXT("FMatHelperModule", "Open MatHelper Manager"),
-					FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
-					FUIAction(FExecuteAction::CreateLambda([]()
-					{
-						AssetViewUtils::OpenEditorForAsset("/MatHelper/MatHelper.MatHelper");
-					}))
-				));
+				AssetViewUtils::OpenEditorForAsset("/MatHelper/MatHelper.MatHelper");
+			}))
+			));
 
-				Section.AddEntry(FToolMenuEntry::InitMenuEntry(
-					"SwitchCN",
-					LOCTEXT("FMatHelperModule", "SwitchCN"),
-					LOCTEXT("FMatHelperModule", "Switch Language Between CN And EN"),
-					FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
-					FUIAction(FExecuteAction::CreateLambda([]()
-					{
-						if(UKismetInternationalizationLibrary::GetCurrentLanguage() == "en")
-						{
-							UKismetInternationalizationLibrary::SetCurrentLanguage("zh-cn",true);
-						}
-						else
-						{
-							UKismetInternationalizationLibrary::SetCurrentLanguage("en",true);
-						}
-					}))
-				));
+			Section.AddEntry(FToolMenuEntry::InitMenuEntry(
+			"SwitchCN",
+			LOCTEXT("FMatHelperModule", "SwitchCN"),
+			LOCTEXT("FMatHelperModule", "Switch Language Between CN And EN"),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
+			FUIAction(FExecuteAction::CreateLambda([]()
+			{
+				if (UKismetInternationalizationLibrary::GetCurrentLanguage() == "en")
+				{
+					UKismetInternationalizationLibrary::SetCurrentLanguage("zh-cn", true);
+				}
+				else
+				{
+					UKismetInternationalizationLibrary::SetCurrentLanguage("en", true);
+				}
+			}))));
+					
+			Section.AddEntry(FToolMenuEntry::InitMenuEntry(
+			"Lock",
+			LOCTEXT("FMatHelperModule", "Lock"),
+			LOCTEXT("FMatHelperModule", "LockSelectedAssets"),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
+			FUIAction(FExecuteAction::CreateRaw(this, &FMatHelperModule::ToggleAssetFlag, true))
+			));
 
-				Section.AddEntry(FToolMenuEntry::InitMenuEntry(
-					"SceneView",
-					LOCTEXT("FMatHelperModule", "SceneView"),
-					LOCTEXT("FMatHelperModule", "Create A SceneView"),
-					FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
-					FUIAction(FExecuteAction::CreateLambda([&]()
-					{
-						FGlobalTabmanager::Get()->TryInvokeTab(SceneViewEditorTabName);
-					}))
-				));
+			Section.AddEntry(FToolMenuEntry::InitMenuEntry(
+			"UnLock",
+			LOCTEXT("FMatHelperModule", "UnLock"),
+			LOCTEXT("FMatHelperModule", "UnLockSelectedAssets"),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
+			FUIAction(FExecuteAction::CreateRaw(this, &FMatHelperModule::ToggleAssetFlag, false))
+			));
 
-				Section.AddEntry(FToolMenuEntry::InitMenuEntry(
-					"Lock",
-					LOCTEXT("FMatHelperModule", "Lock"),
-					LOCTEXT("FMatHelperModule", "LockSelectedAssets"),
-					FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
-					FUIAction(FExecuteAction::CreateRaw(this, &FMatHelperModule::ToggleAssetFlag,true))
-				));
-
-				Section.AddEntry(FToolMenuEntry::InitMenuEntry(
-					"UnLock",
-					LOCTEXT("FMatHelperModule", "UnLock"),
-					LOCTEXT("FMatHelperModule", "UnLockSelectedAssets"),
-					FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
-					FUIAction(FExecuteAction::CreateRaw(this, &FMatHelperModule::ToggleAssetFlag,false))
-				));
-
-				Section.AddEntry(FToolMenuEntry::InitMenuEntry(
-					"Restart",
-					LOCTEXT("FMatHelperModule", "Restart UE"),
-					LOCTEXT("FMatHelperModule", "Restart Engine"),
-					FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
-					FUIAction(FExecuteAction::CreateLambda([]()
-					{
-						bool bRestart = false;
-						bRestart = EAppReturnType::Yes == FMessageDialog::Open(EAppMsgType::YesNo,FText::FromString("Restart UE ?"));
-						if(bRestart)
-						{
-							FUnrealEdMisc::Get().RestartEditor(false);
-						}
-					}))
-				));
-			}),
-			false,
-			FSlateIcon(FAppStyle::GetAppStyleSetName(), "MainFrame.SaveLayout") ));
+			Section.AddEntry(FToolMenuEntry::InitMenuEntry(
+			"Restart",
+			LOCTEXT("FMatHelperModule", "Restart UE"),
+			LOCTEXT("FMatHelperModule", "Restart Engine"),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "DeveloperTools.MenuIcon"),
+			FUIAction(FExecuteAction::CreateLambda([]()
+			{
+				bool bRestart = EAppReturnType::Yes == FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString("Restart UE ?"));
+				if (bRestart)
+				{
+					FUnrealEdMisc::Get().RestartEditor(false);
+				}
+			}))
+			));
+		}),
+					false,
+					FSlateIcon(FAppStyle::GetAppStyleSetName(), "MainFrame.SaveLayout")));
 #pragma  endregion
 
 #pragma region  SceneView
 
-			auto AddSceneViewEntry = [&](FToolMenuSection& Section,const FString& Name,const FName& ID)
+		auto AddSceneViewEntry = [&](FToolMenuSection& Section, const FString& Name, const FName& ID)
+		{
+			Section.AddEntry(FToolMenuEntry::InitMenuEntry(
+			*Name,
+			FText::FromString(Name),FText::FromString("Create SceneView"),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports"),
+			FUIAction(FExecuteAction::CreateLambda([&]()
 			{
-				Section.AddEntry(FToolMenuEntry::InitMenuEntry(
-				*Name,
-				FText::FromString(Name),
-				FText::FromString("Create SceneView"),
-				FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports"),
-				FUIAction(FExecuteAction::CreateLambda([&]()
-				{
-					FGlobalTabmanager::Get()->TryInvokeTab(ID);
-				}))));
-			};
-			
-			InSection.AddEntry(FToolMenuEntry::InitSubMenu("SceneView",FText::FromString("SceneView"),FText::GetEmpty(),FNewToolMenuDelegate::CreateLambda([&](UToolMenu* InToolMenu)
-			{
-				FToolMenuSection& Section = InToolMenu->FindOrAddSection("SceneView");
-				AddSceneViewEntry(Section,"Scene View 1",SceneViewEditorTabName1);
-				AddSceneViewEntry(Section,"Scene View 2",SceneViewEditorTabName2);
-				AddSceneViewEntry(Section,"Scene View 3",SceneViewEditorTabName3);
-				AddSceneViewEntry(Section,"Scene View 4",SceneViewEditorTabName4);
-				AddSceneViewEntry(Section,"Scene View 5",SceneViewEditorTabName5);
-				AddSceneViewEntry(Section,"Scene View 6",SceneViewEditorTabName6);
-				AddSceneViewEntry(Section,"Scene View 7",SceneViewEditorTabName7);
-				AddSceneViewEntry(Section,"Scene View 8",SceneViewEditorTabName8);
-				AddSceneViewEntry(Section,"Scene View 9",SceneViewEditorTabName9);
-				
-			}),false,FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports") ));
+				FGlobalTabmanager::Get()->TryInvokeTab(ID);
+			}))));
+		};
+		
+		InSection.AddEntry(FToolMenuEntry::InitSubMenu("SceneView", FText::FromString("SceneView"), FText::GetEmpty(), FNewToolMenuDelegate::CreateLambda([&](UToolMenu* InToolMenu)
+		{
+			FToolMenuSection& Section = InToolMenu->FindOrAddSection("SceneView");
+			AddSceneViewEntry(Section, "Scene View 1", SceneViewEditorTabName1);
+			AddSceneViewEntry(Section, "Scene View 2", SceneViewEditorTabName2);
+			AddSceneViewEntry(Section, "Scene View 3", SceneViewEditorTabName3);
+			AddSceneViewEntry(Section, "Scene View 4", SceneViewEditorTabName4);
+			AddSceneViewEntry(Section, "Scene View 5", SceneViewEditorTabName5);
+			AddSceneViewEntry(Section, "Scene View 6", SceneViewEditorTabName6);
+			AddSceneViewEntry(Section, "Scene View 7", SceneViewEditorTabName7);
+			AddSceneViewEntry(Section, "Scene View 8", SceneViewEditorTabName8);
+			AddSceneViewEntry(Section, "Scene View 9", SceneViewEditorTabName9);
+		}), false, FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports")));
 #pragma endregion
 
-			// ↓ Template ↓
-			//InSection.AddEntry(FToolMenuEntry::InitSubMenu("SceneView",FText::FromString("SceneView"),FText::GetEmpty(),FNewToolMenuDelegate::CreateLambda([&](UToolMenu* InToolMenu)
-			//{
-			//	FToolMenuSection& Section = InToolMenu->FindOrAddSection("SceneView");
-			//	
-			//}),false,FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports")));
-			
-		}));
-	}
+				// ↓ Template ↓
+				//InSection.AddEntry(FToolMenuEntry::InitSubMenu("SceneView",FText::FromString("SceneView"),FText::GetEmpty(),FNewToolMenuDelegate::CreateLambda([&](UToolMenu* InToolMenu)
+				//{
+				//	FToolMenuSection& Section = InToolMenu->FindOrAddSection("SceneView");
+				//	
+				//}),false,FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports")));
+
+			}));
 }
 
 void FMatHelperModule::RegisterNiagaraAutoPlayer()
 {
+	//------------------LevelEditor---------------------------------//
+	UToolMenu* LevelEditorToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.PlayToolBar");
+	FToolMenuSection& LevelEditorSection = LevelEditorToolbarMenu->FindOrAddSection("PluginTools");
 	
-	{
-		UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.PlayToolBar");
-		{
-			FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("PluginTools");
-			{
-				FToolMenuEntry& Entry = Section.AddEntry(
-					FToolMenuEntry::InitToolBarButton(
-						FSimpleButtonCommands::Get().PlayNiagaraAction,
-						FText::FromString("Play Niagara"),
-						FText::FromString("Play Niagara"),
-						FSlateIcon(TEXT("SimpleButtonStyle"),"SimpleButton.Niagara")
-					));
-				Entry.SetCommandList(PlayNiagaraCommands);
-			}
-		}
-	}
-	
-	{
-		UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("AssetEditor.MaterialEditor.ToolBar");
-		{
-			FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("PluginTools");
-			{
-				FToolMenuEntry& Entry = Section.AddEntry(
-					FToolMenuEntry::InitToolBarButton(
-						FSimpleButtonCommands::Get().PlayNiagaraAction,
-						FText::FromString("Play Niagara"),
-						FText::FromString("Play Niagara"),
-						FSlateIcon(TEXT("SimpleButtonStyle"),"SimpleButton.Niagara")
-					));
-				Entry.SetCommandList(PlayNiagaraCommands);
-			}
-		}
-	}
+	LevelEditorSection.AddEntry(FToolMenuEntry::InitToolBarButton(
+	"PlayNiagara",
+	FUIAction(FExecuteAction::CreateStatic(&PlayNiagaraOnEditorWorld)),
+	FText::FromString("Play Niagara"),
+	FText::FromString("Play Niagara"),
+	GetBrush("SimpleButton.Niagara")
+			));
 
-	{
-		UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("AssetEditor.MaterialInstanceEditor.ToolBar");
-		{
-			FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("PluginTools");
-			{
-				FToolMenuEntry& Entry = Section.AddEntry(
-					FToolMenuEntry::InitToolBarButton(
-						FSimpleButtonCommands::Get().PlayNiagaraAction,
-						FText::FromString("Play Niagara"),
-						FText::FromString("Play Niagara"),
-						FSlateIcon(TEXT("SimpleButtonStyle"),"SimpleButton.Niagara")
-					));
-				Entry.SetCommandList(PlayNiagaraCommands);
-
-			//	Section.AddEntry(FToolMenuEntry::InitToolBarButton("SceneView",FToolUIActionChoice::));
-			/*	Section.AddEntry(FToolMenuEntry::InitMenuEntry(
-				"SceneView",
-				FText::FromString("SceneView"),
-				FText::FromString("Create SceneView"),
-				FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Viewports"),
-				FUIAction(FExecuteAction::CreateLambda([&]()
-				{
-					FGlobalTabmanager::Get()->TryInvokeTab(MaterialInstanceSceneViewEditorTabName);
-				}))));*/
-			}
-		}
-	}
+	//------------------MaterialEditor---------------------------------//
+	UToolMenu* MaterialEditorToolbarMenu = UToolMenus::Get()->ExtendMenu("AssetEditor.MaterialEditor.ToolBar");
+	FToolMenuSection& MaterialEditorSection = MaterialEditorToolbarMenu->FindOrAddSection("PluginTools");
+			
+	MaterialEditorSection.AddEntry(FToolMenuEntry::InitToolBarButton(
+	"PlayNiagara",
+	FUIAction(FExecuteAction::CreateStatic(&PlayNiagaraOnEditorWorld)),
+	FText::FromString("Play Niagara"),
+	FText::FromString("Play Niagara"),
+	GetBrush("SimpleButton.Niagara")
+	));
+			
+	//---------------------MaterialInstanceEditor------------------------------//
+	UToolMenu* MaterialInstanceToolbarMenu = UToolMenus::Get()->ExtendMenu("AssetEditor.MaterialInstanceEditor.ToolBar");
+	FToolMenuSection& MaterialInstanceSection = MaterialInstanceToolbarMenu->FindOrAddSection("PluginTools");
+			
+	MaterialInstanceSection.AddEntry(FToolMenuEntry::InitToolBarButton(
+	"PlayNiagara",
+	FUIAction(FExecuteAction::CreateStatic(&PlayNiagaraOnEditorWorld)),
+	FText::FromString("Play Niagara"),
+	FText::FromString("Play Niagara"),
+	GetBrush("SimpleButton.Niagara")
+	));
+			
 
 	auto& SceneOutlinerModule = FModuleManager::LoadModuleChecked<FSceneOutlinerModule>("SceneOutliner");
 	FSceneOutlinerColumnInfo SceneOutlinerColumnInfo(
 		ESceneOutlinerColumnVisibility::Visible,
 		1,
-		FCreateSceneOutlinerColumn::CreateStatic(&::OnCreateOutlinerColumn)
-		);
+		FCreateSceneOutlinerColumn::CreateStatic(&OnCreateOutlinerColumn)
+	);
 	SceneOutlinerModule.RegisterDefaultColumnType<FOuterlineSelectionLockCol>(SceneOutlinerColumnInfo);
-	
+
 }
 
 void FMatHelperModule::ToggleAssetFlag(bool bIsLock)
@@ -613,11 +573,11 @@ void FMatHelperModule::ToggleAssetFlag(bool bIsLock)
 	int32 ConvertFileNum = 0;
 	TArray<FAssetData> ObjectsToExport;
 	AssetSelectionUtils::GetSelectedAssets(ObjectsToExport);
-	if(bIsLock)
+	if (bIsLock)
 	{
-		for(auto AssetData : ObjectsToExport)
+		for (auto AssetData : ObjectsToExport)
 		{
-			if(UPackage* Package = AssetData.GetAsset()->GetOutermost(); !Package->HasAnyPackageFlags(PKG_DisallowExport))
+			if (UPackage* Package = AssetData.GetAsset()->GetOutermost(); !Package->HasAnyPackageFlags(PKG_DisallowExport))
 			{
 				Package->SetPackageFlags(PKG_DisallowExport);
 				ConvertFileNum = ConvertFileNum + 1;
@@ -626,9 +586,9 @@ void FMatHelperModule::ToggleAssetFlag(bool bIsLock)
 	}
 	else
 	{
-		for(auto AssetData : ObjectsToExport)
+		for (auto AssetData : ObjectsToExport)
 		{
-			if(UPackage* Package = AssetData.GetAsset()->GetOutermost(); Package->HasAnyPackageFlags(PKG_DisallowExport))
+			if (UPackage* Package = AssetData.GetAsset()->GetOutermost(); Package->HasAnyPackageFlags(PKG_DisallowExport))
 			{
 				Package->ClearPackageFlags(PKG_DisallowExport);
 				ConvertFileNum = ConvertFileNum + 1;
@@ -636,16 +596,16 @@ void FMatHelperModule::ToggleAssetFlag(bool bIsLock)
 		}
 	}
 
-	EditorNotify(FString::Printf(TEXT("%s %d Files"),bIsLock ? TEXT("Lock") : TEXT("UnLock"),ConvertFileNum),SNotificationItem::CS_Success);
+	EditorNotify(FString::Printf(TEXT("%s %d Files"), bIsLock ? TEXT("Lock") : TEXT("UnLock"), ConvertFileNum), SNotificationItem::CS_Success);
 }
 
 
 
 // 原始函数 void FNiagaraSystemTrackEditor::AddDefaultSystemTracks(const AActor& SourceActor, const FGuid& Binding,	TSharedPtr<ISequencer> Sequencer) 
-void FMatHelperModule::AddDefaultSystemTracks(const AActor& SourceActor, const FGuid& Binding,	TSharedPtr<ISequencer> Sequencer)
+void FMatHelperModule::AddDefaultSystemTracks(const AActor& SourceActor, const FGuid& Binding, TSharedPtr<ISequencer> Sequencer)
 {
 	//ENiagaraAddDefaultsTrackMode TrackMode = GetDefault<UNiagaraEditorSettings>()->DefaultsSequencerSubtracks;
-	if (!SourceActor.IsA<ANiagaraActor>() )
+	if (!SourceActor.IsA<ANiagaraActor>())
 	{
 		return;
 	}
@@ -657,13 +617,13 @@ void FMatHelperModule::AddDefaultSystemTracks(const AActor& SourceActor, const F
 		const UMovieSceneSequence* Sequence = Sequencer->GetFocusedMovieSceneSequence();
 		UMovieScene* MovieScene = Sequence->GetMovieScene();
 		const FGuid ComponentBinding = Sequencer->GetHandleToObject(NiagaraComponent);
-		
+
 		if (MovieScene->FindSpawnable(Binding))
 		{
 			// we only want to add tracks for possessables
 			return;
 		}
-		
+
 		UClass* TrackClass = UMovieSceneNiagaraSystemTrack::StaticClass();
 		const UMovieSceneTrack* NewTrack = MovieScene->FindTrack(TrackClass, ComponentBinding);
 		if (!NewTrack)
@@ -673,7 +633,7 @@ void FMatHelperModule::AddDefaultSystemTracks(const AActor& SourceActor, const F
 			UMovieSceneNiagaraSystemTrack* NiagaraSystemTrack = MovieScene->AddTrack<UMovieSceneNiagaraSystemTrack>(ComponentBinding);
 			NiagaraSystemTrack->SetDisplayName(LOCTEXT("SystemLifeCycleTrackName", "System Life Cycle"));
 			UMovieSceneNiagaraSystemSpawnSection* SpawnSection = NewObject<UMovieSceneNiagaraSystemSpawnSection>(NiagaraSystemTrack, NAME_None, RF_Transactional);
-				
+
 			ENiagaraAgeUpdateMode& NiagaraAgeUpdateMode = SpawnSection->*TAccessPrivate<AccessNiagaraAgeUpdateMode>::Value;
 			NiagaraAgeUpdateMode = ENiagaraAgeUpdateMode::DesiredAge;
 
@@ -696,15 +656,6 @@ void FMatHelperModule::AddDefaultSystemTracks(const AActor& SourceActor, const F
 				(SpawnSectionStartTime + SpawnSectionDuration).RoundToFrame()));
 			NiagaraSystemTrack->AddSection(*SpawnSection);
 		}
-	}
-}
-
-void SMaterialPalette::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
-{
-	if (bNeedRefresh)
-	{
-		RefreshActionsList(true);
-		bNeedRefresh = false;
 	}
 }
 
@@ -735,14 +686,14 @@ static void MatHelperSpace::OpenCommonMap_Clicked(const FString MapPath)
 static TSharedRef<SWidget> MatHelperSpace::GetCommonMapsDropdown()
 {
 	FMenuBuilder MenuBuilder(true, nullptr);
-	
+
 	for (const FSoftObjectPath& Path : GetDefault<UMatHelperSettings>()->CommonEditorMaps)
 	{
 		if (!Path.IsValid())
 		{
 			continue;
 		}
-		
+
 		const FText DisplayName = FText::FromString(Path.GetAssetName());
 		MenuBuilder.AddMenuEntry(
 			DisplayName,
@@ -767,12 +718,12 @@ static void MatHelperSpace::RegisterGameEditorMenus()
 	FToolMenuSection& Section = Menu->AddSection("PlayGameExtensions", TAttribute<FText>(), FToolMenuInsert("Play", EToolMenuInsertType::After));
 
 	FToolMenuEntry CommonMapEntry = FToolMenuEntry::InitComboButton(
-	"CommonMapOptions",
-	FUIAction(FExecuteAction(),FCanExecuteAction::CreateStatic(&HasNoPlayWorld),FIsActionChecked(),FIsActionButtonVisible::CreateStatic(&CanShowCommonMaps)),
-	FOnGetContent::CreateStatic(&GetCommonMapsDropdown),
-	LOCTEXT("CommonMaps_Label", "Common Maps"),
-	LOCTEXT("CommonMaps_ToolTip", "Some commonly desired maps while using the editor"),
-	FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Level")
+		"CommonMapOptions",
+		FUIAction(FExecuteAction(), FCanExecuteAction::CreateStatic(&HasNoPlayWorld), FIsActionChecked(), FIsActionButtonVisible::CreateStatic(&CanShowCommonMaps)),
+		FOnGetContent::CreateStatic(&GetCommonMapsDropdown),
+		LOCTEXT("CommonMaps_Label", "Common Maps"),
+		LOCTEXT("CommonMaps_ToolTip", "Some commonly desired maps while using the editor"),
+		FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Level")
 	);
 	CommonMapEntry.StyleNameOverride = "CalloutToolbar";
 	Section.AddEntry(CommonMapEntry);
@@ -780,7 +731,7 @@ static void MatHelperSpace::RegisterGameEditorMenus()
 // --- END ---Level Map Open Tool
 
 #undef LOCTEXT_NAMESPACE
-	
+
 IMPLEMENT_MODULE(FMatHelperModule, MatHelper)
 /*
  *

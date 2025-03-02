@@ -19,7 +19,7 @@ public:
 	FReply InitialButton();
 	
 private:
-	FMaterialEditor* MatEditorInterface = nullptr;
+	FMaterialEditor* MaterialEditor = nullptr;
 	UMaterial* Material = nullptr;
 	
 	TSharedPtr<SScrollBox> NodeButtonScrollBox;

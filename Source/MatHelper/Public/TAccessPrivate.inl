@@ -9,6 +9,7 @@ struct TAccessPrivate
 	static inline typename T::Type Value;
 };
 
+
 template <class T,typename T::Type Value>
 struct TAccessPrivateStub
 {
@@ -22,6 +23,12 @@ struct TAccessPrivateStub
 
 	static inline FAccessPrivateStub AccessPrivateStub;
 };
+
+#define DEFINE_ACCESS_PRIVATE(StructName,ClassType, MemberType, Member) \
+struct StructName { \
+using Type = MemberType ClassType::*; \
+}; \
+template struct TAccessPrivateStub<StructName, &ClassType::Member>;
 
 /*
 class MyClass 

@@ -3,8 +3,7 @@
 
 #include "ButtonInfoEditor.h"
 
-#include "MatHelper.h"
-#include "MatHelperMgn.h"
+#include "MatHelperSettings.h"
 #include "Interfaces/IPluginManager.h"
 #include "Windows/WindowsPlatformApplicationMisc.h"
 

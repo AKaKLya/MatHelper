@@ -8,31 +8,29 @@ public class MatHelper : ModuleRules
 	{
 		// ...
 		// Get the engine path. Ends with "Engine/"
-		string engine_path = Path.GetFullPath(Target.RelativeEnginePath);
+		var EnginePath = Path.GetFullPath(Target.RelativeEnginePath);
 		
 		// Now get the base of UE4's modules dir (could also be Developer, Editor, ThirdParty)
-		string Material_path = engine_path + "Source/Editor/MaterialEditor/Private/";
-		string Niagara_path = engine_path + "Plugins/FX/Niagara/Source/NiagaraEditor/Private/Sequencer/LevelSequence/";
-		
+		var MaterialPath = EnginePath + "Source/Editor/MaterialEditor/Private/";
+		var NiagaraPath = EnginePath + "Plugins/FX/Niagara/Source/NiagaraEditor/Private/Sequencer/LevelSequence/";
+		var NiagaraPathB = EnginePath + "Plugins/FX/Niagara/Source/NiagaraEditor/Private/";
 		// now you can include the module's private paths!
 		// as an example, you can expose UE4's abstraction of D3D11, located in Source/Runtime/Windows/D3D11RHI
 	
-		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		PublicIncludePaths.Add(Material_path);
-		PublicIncludePaths.Add(Niagara_path);
+		PublicIncludePaths.Add(Path.Combine(ModuleDirectory, "ThirdParty/Detours/include"));
+		PublicAdditionalLibraries.Add(Path.Combine(ModuleDirectory, "ThirdParty/Detours/lib/x64/detours.lib"));
 		
+		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+
 		PublicIncludePaths.AddRange(
 			new string[] {
-				// ... add public include paths required here ...
+				
 			}
 		);
-				
-		PrivateIncludePaths.Add(Material_path);
-		PrivateIncludePaths.Add(Niagara_path);
 		
 		PrivateIncludePaths.AddRange(
 			new string[] {
-				// ... add other private include paths required here ...
+				MaterialPath,NiagaraPath,NiagaraPathB
 			}
 		);
 			
@@ -40,7 +38,7 @@ public class MatHelper : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core","AssetDefinition", "EngineAssetDefinitions", "MaterialEditor","GraphEditor",
+				"Core","AssetDefinition", "EngineAssetDefinitions", "MaterialEditor","GraphEditor", "NiagaraEditor",
 				// ... add other public dependencies that you statically link with here ...
 			}
 		);

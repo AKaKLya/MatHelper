@@ -7,12 +7,13 @@
 #include "ISceneOutlinerTreeItem.h"
 #include "MatHelper.h"
 #include "NiagaraActor.h"
-#include "ButtonClass/SimpleButtonStyle.h"
+
 
 
 SHeaderRow::FColumn::FArguments FOuterlineSelectionLockCol::ConstructHeaderRowColumn()
 {
-	const ISlateStyle* Style = &FSimpleButtonStyle::Get();
+	auto Image = FMatHelperModule::Get().GetBrush("SimpleButton.Niagara");
+	const FSlateBrush* Brush = Image.GetIcon();
 	return SHeaderRow::Column(GetColumnID())
 	.FixedWidth(24.f)
 	.HAlignHeader(HAlign_Center)
@@ -24,7 +25,7 @@ SHeaderRow::FColumn::FArguments FOuterlineSelectionLockCol::ConstructHeaderRowCo
 		SNew(SImage)
 		.ColorAndOpacity(FSlateColor::UseForeground())
 		.DesiredSizeOverride(FVector2D(20,20))
-		.Image(Style->GetBrush("SimpleButton.Niagara"))
+		.Image(Brush)
 	];
 	
 }

@@ -15,13 +15,14 @@ class SMatHelperWidget;
 class IMaterialEditor;
 
 
+
 class FMatHelperModule : public IModuleInterface
 {
 public:
 	static FMatHelperModule& Get();
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
-	void EditorNotify(const FString&  NotifyInfo, SNotificationItem::ECompletionState State);
+	static void EditorNotify(const FString&  NotifyInfo, SNotificationItem::ECompletionState State);
 	static void RefreshAllWidgetButton();
 
 	FString GetPluginPath() {return PluginPath;};
@@ -29,23 +30,20 @@ public:
 	TSharedRef<SDockTab> OnSpawnButtonInfoEditor(const FSpawnTabArgs& SpawnTabArgs);
 	TSharedRef<SDockTab> OnSpawnSceneEditorView(const FSpawnTabArgs& SpawnTabArgs);
 	
-	UMatHelperMgn* MatHelperMgn;
-	
-	inline static const FName ButtonInfoEditorTabName = "ButtonInfoEditor";
-	inline static const FName SceneViewEditorTabName = "SceneEditorView";
+	//UMatHelperMgn* MatHelperMgn;
 	inline static const FName MaterialSceneViewEditorTabName = "MaterialSceneEditorView";
+	inline static const FName ButtonInfoEditorTabName = "ButtonInfoEditor";
+	FSlateIcon GetBrush(const FString& Name);
 	
 	static void PlayNiagaraOnEditorWorld();
 	
 private:
 	FString PluginPath;
-	TSharedPtr<class FUICommandList> PlayNiagaraCommands;
-	
+	TUniquePtr<FSlateStyleSet> Style;
 	void RegisterTab();
 	void RegisterButton();
 	void RegisterNiagaraAutoPlayer();
 	void ToggleAssetFlag(bool bIsLock);
-	void NiagaraToolBarExtend(FToolBarBuilder& ToolbarBuilder);
 	
 	void InitMatEditorHook();
 	void InitNiagaraEditorHook();

@@ -4,7 +4,6 @@
 #include "EngineClass/CusAssetDefinition_MatInterface.h"
 
 #include "ContentBrowserMenuContexts.h"
-#include "IAssetTools.h"
 #include "IContentBrowserSingleton.h"
 #include "MaterialPropertyHelpers.h"
 #include "MaterialEditor/MaterialEditorInstanceConstant.h"

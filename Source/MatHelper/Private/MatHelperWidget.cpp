@@ -1,17 +1,18 @@
 // Copyright AKaKLya 2024
 
 #include "MatHelperWidget.h"
+
+#include "AssetToolsModule.h"
 #include "TAccessPrivate.inl"
 #include "AssetViewUtils.h"
 #include "EditorWidgetsModule.h"
 #include "IContentBrowserSingleton.h"
+#include "ISettingsModule.h"
 #include "MaterialGraphNode_Knot.h"
-#include "MaterialPropertyHelpers.h"
 #include "MatHelper.h"
-#include "MatHelperMgn.h"
+#include "MatHelperSettings.h"
 #include "Editor/MaterialEditor/Private/MaterialEditor.h"
-#include "Kismet/KismetMathLibrary.h"
-#include "MaterialEditor/MaterialEditorInstanceConstant.h"
+#include "Factories/MaterialInstanceConstantFactoryNew.h"
 #include "MaterialGraph/MaterialGraphNode.h"
 #include "MaterialGraph/MaterialGraphNode_Comment.h"
 #include "MaterialGraph/MaterialGraphNode_Composite.h"
@@ -20,19 +21,12 @@
 #include "Materials/MaterialExpressionParameter.h"
 #include "Materials/MaterialExpressionTextureSampleParameter.h"
 #include "Materials/MaterialInstanceConstant.h"
-#include "Subsystems/EditorAssetSubsystem.h"
 #include "Windows/WindowsPlatformApplicationMisc.h"
-
 
 
 #define LOCTEXT_NAMESPACE "MaterialPalette"
 
-struct AccessGraph
-{
-	typedef TWeakPtr<class SGraphEditor> (FMaterialEditor::*Type);
-};
-
-template struct TAccessPrivateStub<AccessGraph,&FMaterialEditor::FocusedGraphEdPtr>;
+DEFINE_ACCESS_PRIVATE(AccessGraph,FMaterialEditor,TWeakPtr<SGraphEditor>,FocusedGraphEdPtr)
 
 void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMatEditor)
 {
@@ -41,8 +35,8 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 	
 	FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	
-	MatEditorInterface = InMatEditor;
-	Material = Cast<UMaterial>(MatEditorInterface->OriginalMaterialObject);
+	MaterialEditor = InMatEditor;
+	Material = Cast<UMaterial>(MaterialEditor->OriginalMaterialObject);
 	
 	PluginConfigPath = MatHelper.GetPluginPath().Append("/Config/");
 	
@@ -66,7 +60,9 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.HAlign(HAlign_Center)
 		.OnClicked_Lambda([]()
 		{
-			AssetViewUtils::OpenEditorForAsset("/MatHelper/MatHelper.MatHelper");
+			FModuleManager::LoadModuleChecked<ISettingsModule>("Settings").ShowViewer("Editor", "Plugins", "MatHelperSettings");
+		
+			//AssetViewUtils::OpenEditorForAsset("/MatHelper/MatHelper.MatHelper");
 			return FReply::Handled();
 		})
 	];
@@ -81,7 +77,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.HAlign(HAlign_Center)
 		.OnClicked_Lambda([&]()
 		{
-			MatEditorInterface->GetTabManager()->TryInvokeTab(FMatHelperModule::MaterialSceneViewEditorTabName);
+			MaterialEditor->GetTabManager()->TryInvokeTab(FMatHelperModule::MaterialSceneViewEditorTabName);
 			return FReply::Handled();
 		})
 	];
@@ -169,8 +165,8 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 		.HAlign(HAlign_Center)
 		.OnClicked_Lambda([&]()
 		{
-			MatEditorInterface->FocusWindow();
-			TArray<UObject*> SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
+			MaterialEditor->FocusWindow();
+			TArray<UObject*> SelectedNodes = MaterialEditor->GetSelectedNodes().Array();
 			if(SelectedNodes.Num() == 0)
 			{
 				return FReply::Handled();
@@ -184,7 +180,7 @@ void SMatHelperWidget::Construct(const FArguments& InArgs,FMaterialEditor* InMat
 			UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(SelectedNodes[0]);
 			MatNode->MaterialExpression->bShowOutputNameOnPin = !MatNode->MaterialExpression->bShowOutputNameOnPin;
 			MatNode->RecreateAndLinkNode();
-			MatEditorInterface->UpdateMaterialAfterGraphChange();
+			MaterialEditor->UpdateMaterialAfterGraphChange();
 			return FReply::Handled();
 		})
 	];
@@ -246,17 +242,17 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup,bool AllGroup) const
 
 	if(AllGroup == true)
 	{
-		const auto GraphEdPtr =  MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
+		const auto GraphEdPtr =  MaterialEditor->*TAccessPrivate<AccessGraph>::Value;
 		if(const auto GraphEd = GraphEdPtr.Pin().Get())
 		{
 			GraphEd->SelectAllNodes();
 		}
 	}
-	const FMatHelperModule& MatHelper = FMatHelperModule::Get();
-	TArray<FString> Names = MatHelper.MatHelperMgn->AutoGroupKeys;
+
+	TArray<FString> Names = GetDefault<UMatHelperSettings>()->AutoGroupKeys;
 	
-	auto SelectedNodes = MatEditorInterface->GetSelectedNodes();
-	MatEditorInterface->FocusWindow();
+	auto SelectedNodes = MaterialEditor->GetSelectedNodes();
+	MaterialEditor->FocusWindow();
 	
 	FString GroupName = GroupText->GetText().ToString(); // 提前获取组名
 
@@ -299,15 +295,15 @@ FReply SMatHelperWidget::SetNodeGroup(bool AutoGroup,bool AllGroup) const
 	
 	if(ShouldRefresh)
 	{
-		MatEditorInterface->UpdateMaterialAfterGraphChange();
+		MaterialEditor->UpdateMaterialAfterGraphChange();
 	}
 	return FReply::Handled();
 }
 
 FReply SMatHelperWidget::AddNodeMaskPin()
 {
-	MatEditorInterface->FocusWindow();
-	TArray<UObject*> SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
+	MaterialEditor->FocusWindow();
+	TArray<UObject*> SelectedNodes = MaterialEditor->GetSelectedNodes().Array();
 	if(SelectedNodes.Num() == 0)
 	{
 		return FReply::Handled();
@@ -347,81 +343,71 @@ FReply SMatHelperWidget::AddNodeMaskPin()
 		Outputs.RemoveAt(Index);
 	}
 	
-	MatEditorInterface->FocusWindow();
+	MaterialEditor->FocusWindow();
 	MatNode->RecreateAndLinkNode();
-	MatEditorInterface->UpdateMaterialAfterGraphChange();
+	MaterialEditor->UpdateMaterialAfterGraphChange();
 	
 	return FReply::Handled();
 }
-
-
 
 FReply SMatHelperWidget::CreateInstance()
 {
-	FMatHelperModule& MatHelper = FMatHelperModule::Get();
-	FString TargetPath = Material->GetPathName();
-	const FString BaseName = Material->GetName();
-	TargetPath.ReplaceInline(*BaseName,*FString(""));
-	TargetPath.ReplaceInline(*FString("."),*FString(""));
-
-	FString NewBaseName = BaseName;
-	if(BaseName.Left(2) == "M_")
+	if (!Material || !Material->IsValidLowLevel())
 	{
-		NewBaseName.ReplaceInline(*FString("M_"),*FString("MI_"));
+		FMatHelperModule::EditorNotify("Invalid Parent Material", SNotificationItem::CS_Fail);
+		return FReply::Handled();
+	}
+
+	// 1. 生成材质实例名称
+	FString BaseName = Material->GetName();
+	FString NewBaseName;
+
+	if (BaseName.StartsWith("M_"))
+	{
+		NewBaseName = BaseName.Replace(*FString("M_"), *FString("MI_"), ESearchCase::CaseSensitive);
 	}
 	else
 	{
-		NewBaseName = "MI_" + BaseName;
+		NewBaseName = FString("MI_") + BaseName;
 	}
-	FString InText = InstanceText->GetText().ToString();
+	NewBaseName = NewBaseName + "_" + InstanceText->GetText().ToString();
+	
+	// 2. 生成唯一资产路径
+	FString PackagePath = Material->GetOutermost()->GetName();
+	PackagePath = FPackageName::GetLongPackagePath(PackagePath); // 去掉文件名，只保留路径
 
-	if(InText == "")
-	{
-		InText = "Inst" + FString::FromInt(UKismetMathLibrary::RandomIntegerInRange(0,99));
-	}
-	
-	const FString NewName = NewBaseName + "_" + InText;
+	FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
+	FString FinalAssetName;
+	FString UniquePackageName;
+	AssetToolsModule.Get().CreateUniqueAssetName(PackagePath / NewBaseName,"",UniquePackageName,FinalAssetName);
 
-	
-	const FString NewPath = TargetPath + NewName;
-	
-	UEditorAssetSubsystem* EditorAssetSubsystem = GEditor->GetEditorSubsystem<UEditorAssetSubsystem>();
-	if(EditorAssetSubsystem->DoesAssetExist(NewPath))
+	// 3. 创建材质实例工厂
+	UMaterialInstanceConstantFactoryNew* Factory = NewObject<UMaterialInstanceConstantFactoryNew>();
+	Factory->InitialParent = Material; // 直接设置父材质
+
+	// 4. 通过AssetTools创建材质实例
+	UObject* NewAsset = AssetToolsModule.Get().CreateAsset(FinalAssetName,FPackageName::GetLongPackagePath(UniquePackageName),
+		UMaterialInstanceConstant::StaticClass(),Factory);
+
+	UMaterialInstanceConstant* NewMIC = Cast<UMaterialInstanceConstant>(NewAsset);
+	if (!NewMIC)
 	{
-		MatHelper.EditorNotify("Create Fail - This Instance Exists",SNotificationItem::CS_Fail);
+		FMatHelperModule::EditorNotify("Failed to Create Material Instance", SNotificationItem::CS_Fail);
 		return FReply::Handled();
 	}
-	UMaterialInstance* NewMi = Cast<UMaterialInstance>(EditorAssetSubsystem->DuplicateAsset(MIEmptyPath, NewPath));
-	NewMi->Parent=Material;
 	
-	UMaterialInstanceConstant* ConstMat = static_cast<UMaterialInstanceConstant*>(NewMi);
-	const auto MaterialEditorInstance = NewObject<UMaterialEditorInstanceConstant>(GetTransientPackage(), NAME_None, RF_Transactional);
-	MaterialEditorInstance->SetSourceInstance(ConstMat);
+	// 5. 自动打开材质编辑器
+	TArray<UObject*> AssetsToSync = { NewMIC };
+	IContentBrowserSingleton::Get().SyncBrowserToAssets(AssetsToSync);
+	AssetViewUtils::OpenEditorForAsset(NewMIC);
 
-	const int32 GroupNum = MaterialEditorInstance->ParameterGroups.Num();
-	for (int32 GroupIdx = 0; GroupIdx <GroupNum ; ++GroupIdx)
-	{
-		FEditorParameterGroup& ParameterGroup = MaterialEditorInstance->ParameterGroups[GroupIdx];
-		
-		int32 ParameterNum = ParameterGroup.Parameters.Num();
-		for (int32 ParamIdx = 0; ParamIdx < ParameterNum; ++ParamIdx)
-		{
-			UDEditorParameterValue* Parameter = ParameterGroup.Parameters[ParamIdx];
-			FMaterialPropertyHelpers::OnOverrideParameter(true,Parameter,MaterialEditorInstance);
-		}
-	}
-	
-	TArray<UObject*> AssetList;
-	AssetList.Add(NewMi);
-	IContentBrowserSingleton::Get().SyncBrowserToAssets(AssetList);
-	AssetViewUtils::OpenEditorForAsset(NewMi);
-	
 	return FReply::Handled();
 }
 
+
 FReply SMatHelperWidget::ToggleRefraction() const
 {
-	auto& Ref = MatEditorInterface->GetMaterialInterface()->GetMaterial()->RefractionMethod;
+	auto& Ref = MaterialEditor->GetMaterialInterface()->GetMaterial()->RefractionMethod;
 	if (Ref == RM_None)
 	{
 		Ref = RM_IndexOfRefraction;
@@ -430,16 +416,16 @@ FReply SMatHelperWidget::ToggleRefraction() const
 	{
 		Ref = RM_None;
 	}
-	const auto BaseRootNode =  MatEditorInterface->GetMaterialInterface()->GetMaterial()->MaterialGraph->RootNode;
+	const auto BaseRootNode =  MaterialEditor->GetMaterialInterface()->GetMaterial()->MaterialGraph->RootNode;
 	Cast<UMaterialGraphNode_Root>(BaseRootNode)->ReconstructNode();
-	MatEditorInterface->UpdateMaterialAfterGraphChange();
+	MaterialEditor->UpdateMaterialAfterGraphChange();
 	return FReply::Handled();
 }
 
 FReply SMatHelperWidget::FixFunctionNode() const
 {
 	bool bNeedRefreshNode = false;
-	auto Nodes = MatEditorInterface->GetSelectedNodes().Array();
+	auto Nodes = MaterialEditor->GetSelectedNodes().Array();
 	for(const auto Node : Nodes)
 	{
 		UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(Node);
@@ -451,7 +437,7 @@ FReply SMatHelperWidget::FixFunctionNode() const
 	}
 	if(bNeedRefreshNode)
 	{
-		MatEditorInterface->UpdateMaterialAfterGraphChange();
+		MaterialEditor->UpdateMaterialAfterGraphChange();
 	}
 	return FReply::Handled();
 		
@@ -459,18 +445,18 @@ FReply SMatHelperWidget::FixFunctionNode() const
 
 FReply SMatHelperWidget::InitialButton()
 {
-	const FMatHelperModule& MatHelper = FMatHelperModule::Get();
 	for(auto Button : NodeButtons)
 	{
 		NodeButtonScrollBox->RemoveSlot(Button.ToSharedRef());
 	}
 	NodeButtons.Empty();
 
-	const int32 Num = MatHelper.MatHelperMgn->NodeButtonInfo.Num();
+	const UMatHelperSettings* MatHelperSettings = GetDefault<UMatHelperSettings>();
+	const int32 Num = MatHelperSettings->NodeButtonInfo.Num();
 	
 	for(int i = 0 ; i < Num ; i++)
 	{
-		FNodeButton ButtonInfo = MatHelper.MatHelperMgn->NodeButtonInfo[i];
+		FNodeButton ButtonInfo = MatHelperSettings->NodeButtonInfo[i];
 		TSharedPtr<SButton> Button = SNew(SButton)
 		.Text(FText::FromString( ButtonInfo.ButtonName))
 		.VAlign(VAlign_Center)
@@ -492,8 +478,8 @@ FReply SMatHelperWidget::InitialButton()
 
 FReply SMatHelperWidget::CreateMatNode(int32 Index) const
 {
-	FMatHelperModule& MatHelper = FMatHelperModule::Get();
-	const FString NodeFileName = PluginConfigPath + "AddNodeFile/" + MatHelper.MatHelperMgn->NodeButtonInfo[Index].ButtonName + ".txt";
+	const UMatHelperSettings* MatHelperSettings = GetDefault<UMatHelperSettings>();
+	const FString NodeFileName = PluginConfigPath + "AddNodeFile/" + MatHelperSettings->NodeButtonInfo[Index].ButtonName + ".txt";
 	
 	if(FPaths::FileExists(NodeFileName) == false)
 	{
@@ -505,7 +491,7 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index) const
 	if(NodeText.Len() == 0)
 	{
 		
-		MatHelper.EditorNotify("This Text Maybe Empty.",SNotificationItem::CS_Fail);
+		FMatHelperModule::EditorNotify("This Text Maybe Empty.",SNotificationItem::CS_Fail);
 		return FReply::Handled();
 	}
 	
@@ -513,44 +499,44 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index) const
 	FPlatformApplicationMisc::ClipboardPaste(ClipboardContent);
 	FPlatformApplicationMisc::ClipboardCopy(*NodeText);
 	
-	MatEditorInterface->FocusWindow();
-	auto SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
+	MaterialEditor->FocusWindow();
+	auto SelectedNodes = MaterialEditor->GetSelectedNodes().Array();
 	
 	FVector2D RootOffset;
-	if(MatHelper.MatHelperMgn->NodeButtonInfo[Index].RootOffsetOverride)
+	if(MatHelperSettings->NodeButtonInfo[Index].RootOffsetOverride)
 	{
-		RootOffset = MatHelper.MatHelperMgn->NodeButtonInfo[Index].RootOffset;
+		RootOffset = MatHelperSettings->NodeButtonInfo[Index].RootOffset;
 	}
 	else
 	{
-		RootOffset = MatHelper.MatHelperMgn->RootOffset;
+		RootOffset = MatHelperSettings->RootOffset;
 	}
 
-	const FVector2D BaseOffset = MatHelper.MatHelperMgn->BaseOffset;
+	const FVector2D BaseOffset = MatHelperSettings->BaseOffset;
 
-	const TObjectPtr<UMaterialGraph> Graph = MatEditorInterface->GetMaterialInterface()->GetMaterial()->MaterialGraph;
+	const TObjectPtr<UMaterialGraph> Graph = MaterialEditor->GetMaterialInterface()->GetMaterial()->MaterialGraph;
 	if(SelectedNodes.Num() > 0)
 	{
 		UObject* SelectedNode = SelectedNodes[0];
 		if(const auto RootNode = Cast<UMaterialGraphNode_Root>(SelectedNode))
 		{
 			const FVector2D Location = FVector2D(RootNode->NodePosX + RootOffset.X,RootNode->NodePosY + RootOffset.Y);
-			MatEditorInterface->PasteNodesHere(Location);
+			MaterialEditor->PasteNodesHere(Location);
 		}
 		else if(const auto BaseNode = Cast<UMaterialGraphNode>(SelectedNode))
 		{
 			const FVector2D Location = FVector2D(BaseNode->NodePosX + BaseOffset.X,BaseNode->NodePosY + BaseOffset.Y);
-			MatEditorInterface->PasteNodesHere(Location);
+			MaterialEditor->PasteNodesHere(Location);
 		}
 	}
 	else
 	{
 		const auto BaseRootNode =  Graph->RootNode;
 		const FVector2D Location = FVector2D(BaseRootNode->NodePosX + RootOffset.X,BaseRootNode->NodePosY + RootOffset.Y);
-		MatEditorInterface->PasteNodesHere(Location);
+		MaterialEditor->PasteNodesHere(Location);
 	}
-	
-	auto NewNodes = MatEditorInterface->GetSelectedNodes().Array();
+
+	auto NewNodes = MaterialEditor->GetSelectedNodes().Array();
 	
 	for(const auto Node : NewNodes)
 	{
@@ -559,10 +545,10 @@ FReply SMatHelperWidget::CreateMatNode(int32 Index) const
 		{
 			MatNode->RecreateAndLinkNode();
 		}
-		MatEditorInterface->AddToSelection(MatNode->MaterialExpression);
+		MaterialEditor->AddToSelection(MatNode->MaterialExpression);
 	}
 
-	const TWeakPtr<SGraphEditor> GraphEdPtr = MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
+	const TWeakPtr<SGraphEditor> GraphEdPtr = MaterialEditor->*TAccessPrivate<AccessGraph>::Value;
 	GraphEdPtr.Pin().Get()->JumpToNode(Cast<UMaterialGraphNode>(NewNodes[0]),false,false);
 	
 	
@@ -596,12 +582,12 @@ FReply SMatHelperWidget::RemoveParameterType() const
 {
 	bool ShouldRefresh = false;
 
-	const auto GraphEdPtr = MatEditorInterface->*TAccessPrivate<AccessGraph>::Value;
+	const auto GraphEdPtr = MaterialEditor->*TAccessPrivate<AccessGraph>::Value;
 	if (const auto GraphEd = GraphEdPtr.Pin().Get()) {
 	    GraphEd->SelectAllNodes();
 	}
 	
-	auto SelectedNodes = MatEditorInterface->GetSelectedNodes().Array();
+	auto SelectedNodes = MaterialEditor->GetSelectedNodes().Array();
 	if (SelectedNodes.Num() == 0) {
 	    return FReply::Handled();
 	}
@@ -628,15 +614,14 @@ FReply SMatHelperWidget::RemoveParameterType() const
 	}
 
 	if (ShouldRefresh) {
-	    MatEditorInterface->UpdateMaterialAfterGraphChange();
+	    MaterialEditor->UpdateMaterialAfterGraphChange();
 	}
 	return FReply::Handled();
 }
 
 void SMatHelperWidget::RefreshMaskPinSelection()
 {
-	const FMatHelperModule& MatHelper = FMatHelperModule::Get();
-	TArray<FNodeMaskPin> Array = MatHelper.MatHelperMgn->MaskPinInfo;
+	TArray<FNodeMaskPin> Array = GetDefault<UMatHelperSettings>()->MaskPinInfo;
 	for(auto& Info : Array)
 	{
 		MaskPinOptions.Add(MakeShareable(new FString(Info.ButtonName)));

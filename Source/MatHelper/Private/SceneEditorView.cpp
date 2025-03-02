@@ -4,8 +4,7 @@
 #include "SceneEditorView.h"
 
 #include "LevelEditorViewport.h"
-#include "MatHelper.h"
-#include "MatHelperMgn.h"
+#include "MatHelperSettings.h"
 #include "SceneEditorViewToolBar.h"
 #include "Subsystems/EditorActorSubsystem.h"
 
@@ -26,7 +25,8 @@ SceneEditorView::~SceneEditorView()
 
 void SceneEditorView::UpdateViewPortLocation()
 {
-	ESceneViewMethod bSelectCamera = FMatHelperModule::Get().MatHelperMgn->SceneViewMethod;
+	const UMatHelperSettings* MatHelperSettings = GetDefault<UMatHelperSettings>();
+	ESceneViewMethod bSelectCamera = MatHelperSettings->SceneViewMethod;
 	switch (bSelectCamera)
 	{
 	case ESceneViewMethod::Auto:
